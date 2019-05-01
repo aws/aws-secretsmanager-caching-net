@@ -10,28 +10,13 @@ To use this client, you must have:
     * .NET Framework 4.6.1 or higher
     * .NET Standard 2.0 or higher
 
-* An Amazon Web Services (AWS) account to access secrets stored in AWS Secrets Manager and use AWS SDK for C#.
+* An Amazon Web Services (AWS) account to access secrets stored in AWS Secrets Manager and use AWS SDK for .NET.
 
     * **To create an AWS account**, go to [Sign In or Create an AWS Account](https://portal.aws.amazon.com/gp/aws/developer/registration/index.html) and then choose **I am a new user.** Follow the instructions to create an AWS account.
 
     * **To create a secret in AWS Secrets Manager**, go to [Creating Secrets](https://docs.aws.amazon.com/secretsmanager/latest/userguide/manage_create-basic-secret.html) and follow the instructions on that page.
 
     * **To download and install the AWS SDK for .NET**, go to [Installing the AWS SDK for .NET](https://aws.amazon.com/sdk-for-net/) in the AWS SDK for .NET documentation and then follow the instructions on that page.
-
-To use this client, you must have a .NET project with one of the following:
-
-* .NET Framework 4.6.1 or higher
-* .NET Standard 2.0 or higher
-
-## Optional Prerequisites
-
-You must have an Amazon Web Services (AWS) account to access secrets stored in AWS Secrets Manager and use AWS SDK for .NET.
-
-* **To create an AWS account**, go to [Sign In or Create an AWS Account](https://portal.aws.amazon.com/gp/aws/developer/registration/index.html) and then choose **I am a new user.** Follow the instructions to create an AWS account.
-
-* **To create a secret in AWS Secrets Manager**, go to [Creating Secrets](https://docs.aws.amazon.com/secretsmanager/latest/userguide/manage_create-basic-secret.html) and follow the instructions on that page.
-
-* **To download and install the AWS SDK for .NET**, go to [Installing the AWS SDK for .NET](https://aws.amazon.com/sdk-for-net/) in the AWS SDK for .NET documentation and then follow the instructions on that page.
 
 ## Download
 
