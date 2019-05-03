@@ -1,4 +1,4 @@
-# AWS Secrets Manager Caching Client for C#
+# AWS Secrets Manager Caching Client for .NET
 
 The AWS Secrets Manager caching client enables in-process caching of secrets for .NET applications.
 
