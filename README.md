@@ -24,9 +24,10 @@ You can get the latest release from `Nuget`:
 
 ```xml
 <ItemGroup>
-     <PackageReference Include="AWSSDK.SecretsManager.Caching" Version="1.0.0.0" />
+     <PackageReference Include="AWSSDK.SecretsManager.Caching" Version="1.0.1" />
 </ItemGroup>
 ```
+Please note that `1.0.1` is the latest stable version.
 
 ## Getting Started
 
@@ -68,7 +69,7 @@ You can configure the `SecretCacheConfiguration` object with the following param
 We use GitHub issues for tracking bugs and caching library feature requests and have limited bandwidth to address them. Please use these community resources for getting help:
 * Ask a question on [Stack Overflow](https://stackoverflow.com/) and tag it with [aws-secrets-manager](https://stackoverflow.com/questions/tagged/aws-secrets-manager).
 * Open a support ticket with [AWS Support](https://console.aws.amazon.com/support/home#/).
-* if it turns out that you may have found a bug, please [open an issue](https://github.com/aws/aws-secretsmanager-caching-csharp/issues/new). 
+* If it turns out that you may have found a bug, please [open an issue](https://github.com/aws/aws-secretsmanager-caching-csharp/issues/new). 
 
 ## License
 
