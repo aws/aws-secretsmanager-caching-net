@@ -24,10 +24,9 @@ You can get the latest release from `Nuget`:
 
 ```xml
 <ItemGroup>
-     <PackageReference Include="AWSSDK.SecretsManager.Caching" Version="1.0.1" />
+     <PackageReference Include="AWSSDK.SecretsManager.Caching" Version="1.0.2" />
 </ItemGroup>
 ```
-Please note that `1.0.1` is the latest stable version.
 
 ## Getting Started
 
