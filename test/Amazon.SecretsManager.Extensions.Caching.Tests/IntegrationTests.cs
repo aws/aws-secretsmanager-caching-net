@@ -1,6 +1,5 @@
 ﻿namespace Amazon.SecretsManager.Extensions.Caching.Tests
 {
-    using Moq;
     using Xunit;
     using Amazon.SecretsManager.Model;
     using System;
@@ -8,7 +7,6 @@
     using System.Collections.Generic;
     using System.IO;
     using System.Linq;
-    using Amazon.Runtime;
 
     // Performs test secret cleanup before and after integ tests are run
     public abstract class TestBase : IDisposable
@@ -20,17 +18,18 @@
         public TestBase()
         {
             FindPreviousTestSecrets();
-            DeleteSecrets();
+            DeleteSecrets(forceDelete: false);
         }
 
         public void Dispose()
         {
-            DeleteSecrets();
+            DeleteSecrets(forceDelete: true);
         }
 
         private void FindPreviousTestSecrets()
         {
             String nextToken = null;
+            var twoDaysAgo = DateTime.Now.AddDays(-2);
             do
             {
                 var response = TestBase.Client.ListSecrets(new ListSecretsRequest { NextToken = nextToken });
@@ -38,19 +37,23 @@
                 List<SecretListEntry> secretList = response.SecretList;
                 foreach (SecretListEntry secret in secretList)
                 {
-                    if (secret.Name.StartsWith(TestSecretPrefix))
+                    if (secret.Name.StartsWith(TestSecretPrefix)
+                        && DateTime.Compare(secret.LastChangedDate, twoDaysAgo) < 0
+                        && DateTime.Compare(secret.LastAccessedDate, twoDaysAgo) < 0)
                     {
                         SecretNamesToDelete.Add(secret.Name);
                     }
                 }
+                Thread.Sleep(1000);
             } while (nextToken != null);
         }
 
-        private void DeleteSecrets()
+        private void DeleteSecrets(bool forceDelete)
         {
             foreach (String secretName in SecretNamesToDelete)
             {
-                TestBase.Client.DeleteSecret(new DeleteSecretRequest { SecretId = secretName });
+                TestBase.Client.DeleteSecret(new DeleteSecretRequest { SecretId = secretName, ForceDeleteWithoutRecovery = forceDelete });
+                Thread.Sleep(500);
             }
             SecretNamesToDelete.Clear();
         }
@@ -61,7 +64,7 @@
         private SecretsManagerCache cache;
         private String testSecretString = System.Guid.NewGuid().ToString();
         private MemoryStream testSecretBinary = new MemoryStream(Enumerable.Repeat((byte)0x20, 10).ToArray());
-        
+
         private enum TestType { SecretString = 0, SecretBinary = 1 };
 
         private String Setup(TestType type)
