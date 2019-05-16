@@ -62,7 +62,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
             this.secretsManager = secretsManager;
             cacheItemPolicy = new MemoryCacheEntryOptions()
             {
-                SlidingExpiration = TimeSpan.FromMilliseconds(this.config.CacheItemTTL)
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromMilliseconds(this.config.CacheItemTTL)
             };
             if (this.secretsManager is AmazonSecretsManagerClient sm)
             {

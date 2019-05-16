@@ -27,10 +27,6 @@ namespace Amazon.SecretsManager.Extensions.Caching
         /// The cached secret value versions for this cached secret. 
         private readonly MemoryCache versions = new MemoryCache(new MemoryCacheOptions());
         private const ushort MAX_VERSIONS_CACHE_SIZE = 10;
-
-        /// The next scheduled refresh time for this item.  Once the item is accessed
-        /// after this time, the item will be synchronously refreshed.
-        private long nextRefreshTime = 0;
         
         public SecretCacheItem(String secretId, IAmazonSecretsManager client, SecretCacheConfiguration config)
             : base(secretId, client, config)
@@ -43,10 +39,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
         /// </summary>
         protected override async Task<DescribeSecretResponse> ExecuteRefreshAsync()
         {
-            DescribeSecretResponse response = await client.DescribeSecretAsync(new DescribeSecretRequest { SecretId = secretId });
-            int ttl = Convert.ToInt32(config.CacheItemTTL);
-            nextRefreshTime = Environment.TickCount + SecretCacheObject<DescribeSecretRequest>.random.Value.Next(ttl / 2, ttl + 1);
-            return response;
+            return await client.DescribeSecretAsync(new DescribeSecretRequest { SecretId = secretId });
         }
 
         /// <summary>
