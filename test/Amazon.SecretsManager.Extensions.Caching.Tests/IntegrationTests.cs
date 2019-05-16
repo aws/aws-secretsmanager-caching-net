@@ -9,7 +9,7 @@
     using System.Linq;
 
     // Performs test secret cleanup before and after integ tests are run
-    public abstract class TestBase : IDisposable
+    public class TestBase : IDisposable
     {
         public static IAmazonSecretsManager Client = new AmazonSecretsManagerClient();
         public static String TestSecretPrefix = "IntegTest";
