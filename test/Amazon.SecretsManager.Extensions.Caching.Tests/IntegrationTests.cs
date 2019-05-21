@@ -129,7 +129,7 @@
         {
             String testSecretName = Setup(TestType.SecretString);
             cache = new SecretsManagerCache(TestBase.Client);
-            Assert.Null(cache.GetSecretBinary(testSecretName));
+            Assert.Null(cache.GetSecretBinary(testSecretName).Result);
         }
 
         [Fact]
@@ -145,7 +145,7 @@
         {
             String testSecretName = Setup(TestType.SecretBinary);
             cache = new SecretsManagerCache(TestBase.Client);
-            Assert.Null(cache.GetSecretString(testSecretName));
+            Assert.Null(cache.GetSecretString(testSecretName).Result);
         }
 
         [Fact]
