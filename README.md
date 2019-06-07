@@ -62,7 +62,7 @@ You can configure the `SecretCacheConfiguration` object with the following param
 * `MaxCacheSize` - The maximum number of items the Cache can contain before evicting using LRU. The default value is `1024`.
 * `VersionStage` - The Version Stage the Cache will request when retrieving secrets from Secrets Manager. The default value is `AWSCURRENT`.
 * `Client` - The Secrets Manager client to be used by the Cache. The default value is `null`, which causes the Cache to instantiate a new Secrets Manager client.
-* `CacheHook` - An implementation of the SecretCacheHook abstract class. The default value is `null`.
+* `CacheHook` - An implementation of the ISecretCacheHook interface. The default value is `null`.
 
 ## Getting Help
 We use GitHub issues for tracking bugs and caching library feature requests and have limited bandwidth to address them. Please use these community resources for getting help:

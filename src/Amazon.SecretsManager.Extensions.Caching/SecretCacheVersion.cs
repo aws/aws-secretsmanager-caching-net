@@ -26,7 +26,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
             : base(secretId, client, config)
         {
             this.versionId = versionId;
-            this.hash = String.Format("%s %s", secretId, versionId).GetHashCode();
+            this.hash = $"{secretId} {versionId}".GetHashCode();
         }
 
         public override bool Equals(object obj)
@@ -43,7 +43,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
 
         public override string ToString()
         {
-            return String.Format("SecretCacheVersion: %s %v", secretId, versionId);
+            return $"SecretCacheVersion: {secretId} {versionId}";
         }
 
         /// <summary>

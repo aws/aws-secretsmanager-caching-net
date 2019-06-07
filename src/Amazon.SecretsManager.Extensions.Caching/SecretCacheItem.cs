@@ -57,12 +57,12 @@ namespace Amazon.SecretsManager.Extensions.Caching
 
         public override int GetHashCode()
         {
-            return String.Format("%s", secretId).GetHashCode();
+            return (secretId ?? string.Empty).GetHashCode();
         }
 
         public override string ToString()
         {
-            return String.Format("SecretCacheItem: %s", secretId);
+            return $"SecretCacheItem: {secretId}";
         }
 
         public override bool Equals(object obj)
