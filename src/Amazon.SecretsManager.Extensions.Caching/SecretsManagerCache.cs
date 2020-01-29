@@ -14,6 +14,7 @@
 namespace Amazon.SecretsManager.Extensions.Caching
 {
     using System;
+    using System.Threading;
     using System.Threading.Tasks;
     using Amazon.Runtime;
     using Amazon.SecretsManager.Model;
@@ -87,22 +88,22 @@ namespace Amazon.SecretsManager.Extensions.Caching
         /// <summary>
         /// Asynchronously retrieves the specified SecretString after calling <see cref="GetCachedSecret"/>.
         /// </summary>
-        public async Task<String> GetSecretString(String secretId)
+        public async Task<String> GetSecretString(String secretId, CancellationToken cancellationToken = default(CancellationToken))
         {
             SecretCacheItem secret = GetCachedSecret(secretId);
             GetSecretValueResponse response = null;
-            response = await secret.GetSecretValue();
+            response = await secret.GetSecretValue(cancellationToken);
             return response?.SecretString;
         }
 
         /// <summary>
         /// Asynchronously retrieves the specified SecretBinary after calling <see cref="GetCachedSecret"/>.
         /// </summary>
-        public async Task<byte[]> GetSecretBinary(String secretId)
+        public async Task<byte[]> GetSecretBinary(String secretId, CancellationToken cancellationToken = default(CancellationToken))
         {
             SecretCacheItem secret = GetCachedSecret(secretId);
             GetSecretValueResponse response = null;
-            response = await secret.GetSecretValue();
+            response = await secret.GetSecretValue(cancellationToken);
             return response?.SecretBinary?.ToArray();
         }
 
@@ -111,9 +112,9 @@ namespace Amazon.SecretsManager.Extensions.Caching
         /// If there is no existing cache entry, a new one is created.
         /// Returns true or false depending on if the refresh is successful.
         /// </summary>
-        public async Task<bool> RefreshNowAsync(String secretId)
+        public async Task<bool> RefreshNowAsync(String secretId, CancellationToken cancellationToken = default(CancellationToken))
         {
-            return await GetCachedSecret(secretId).RefreshNowAsync();
+            return await GetCachedSecret(secretId).RefreshNowAsync(cancellationToken);
         }
 
         /// <summary>
