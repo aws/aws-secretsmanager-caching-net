@@ -94,9 +94,9 @@ namespace Amazon.SecretsManager.Extensions.Caching
             this.config = config;
         }
      
-        protected abstract Task<T> ExecuteRefreshAsync();
+        protected abstract Task<T> ExecuteRefreshAsync(CancellationToken cancellationToken = default(CancellationToken));
 
-        protected abstract Task<GetSecretValueResponse> GetSecretValueAsync(T result);
+        protected abstract Task<GetSecretValueResponse> GetSecretValueAsync(T result, CancellationToken cancellationToken = default(CancellationToken));
 
         /// <summary>
         /// Return the typed result object.
@@ -145,13 +145,13 @@ namespace Amazon.SecretsManager.Extensions.Caching
         /// <summary>
         /// Refresh the cached secret state only when needed.
         /// </summary>
-        private async Task<bool> RefreshAsync()
+        private async Task<bool> RefreshAsync(CancellationToken cancellationToken = default(CancellationToken))
         {
             if (!IsRefreshNeeded()) { return false; }
             refreshNeeded = false;
             try
             {
-                SetResult(await ExecuteRefreshAsync());
+                SetResult(await ExecuteRefreshAsync(cancellationToken));
                 exception = null;
                 exceptionCount = 0;
                 return true;
@@ -171,7 +171,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
         /// Method to force the refresh of a cached secret state.
         /// Returns true if the refresh completed without error.
         /// </summary>
-        public async Task<bool> RefreshNowAsync()
+        public async Task<bool> RefreshNowAsync(CancellationToken cancellationToken = default(CancellationToken))
         {
             refreshNeeded = true;
             // When forcing a refresh, always sleep with a random jitter
@@ -209,13 +209,13 @@ namespace Amazon.SecretsManager.Extensions.Caching
         /// If the secret is due for a refresh, the refresh will occur before the result is returned.
         /// If the refresh fails, the cached result is returned, or the cached exception is thrown.
         /// </summary>
-        public async Task<GetSecretValueResponse> GetSecretValue()
+        public async Task<GetSecretValueResponse> GetSecretValue(CancellationToken cancellationToken = default(CancellationToken))
         {
             bool success = false;
-            await Lock.WaitAsync();
+            await Lock.WaitAsync(cancellationToken);
             try
             {
-                success = await RefreshAsync();
+                success = await RefreshAsync(cancellationToken);
             }
             finally
             {
@@ -226,7 +226,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
             {
                 System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(exception).Throw();
             }
-            return await GetSecretValueAsync(GetResult());
+            return await GetSecretValueAsync(GetResult(), cancellationToken);
         }
     }
 }
