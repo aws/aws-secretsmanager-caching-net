@@ -22,7 +22,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
     /// <summary>
     /// A class used for clide-side caching of secrets stored in AWS Secrets Manager
     /// </summary>
-    public class SecretsManagerCache : IDisposable
+    public class SecretsManagerCache : ISecretsManagerCache
     {
         private readonly IAmazonSecretsManager secretsManager;
         private readonly SecretCacheConfiguration config;
@@ -69,7 +69,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
                 sm.BeforeRequestEvent += this.ServiceClientBeforeRequestEvent;
             }
         }
-        
+
         private void ServiceClientBeforeRequestEvent(object sender, RequestEventArgs e)
         {
             if (e is WebServiceRequestEventArgs args && args.Headers.ContainsKey(VersionInfo.USER_AGENT_HEADER))
