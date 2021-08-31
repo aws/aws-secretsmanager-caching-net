@@ -24,3 +24,5 @@
 **/.vscode
 **/.idea
 *.userprefs
+
+**.DS_Store
