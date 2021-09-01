@@ -1,0 +1,37 @@
+name: Build Test Release
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install dependencies
+        run: dotnet restore
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+        # Integration tests need AWS credentials
+      - name: "Configure AWS Credentials"
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+          aws-region: us-west-2
+      - name: Test
+        run: dotnet test --configuration Release --no-restore --verbosity normal
+  release:
+    # Do not run on fork
+    if: ${{ github.event_name == 'push' }} && github.repository == 'aws/aws-secretsmanager-caching-net'
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pack
+        run: dotnet pack --configuration Release --no-restore
+      - name: Publish
+        run: dotnet publish --configuration Release --no-restore
