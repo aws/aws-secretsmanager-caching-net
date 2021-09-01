@@ -11,7 +11,17 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        dotnet: [ '2.0.x', '5.0.x' ]
     steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: ${{ matrix.dotnet }}
+      - name: Setup .NET Standard
       - name: Install dependencies
         run: dotnet restore
       - name: Build
@@ -25,13 +35,3 @@ jobs:
           aws-region: us-west-2
       - name: Test
         run: dotnet test --configuration Release --no-restore --verbosity normal
-  release:
-    # Do not run on fork
-    if: ${{ github.event_name == 'push' }} && github.repository == 'aws/aws-secretsmanager-caching-net'
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Pack
-        run: dotnet pack --configuration Release --no-restore
-      - name: Publish
-        run: dotnet publish --configuration Release --no-restore
