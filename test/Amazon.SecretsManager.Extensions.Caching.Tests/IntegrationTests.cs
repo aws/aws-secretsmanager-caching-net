@@ -10,24 +10,24 @@
     using System.Linq;
 
     // Performs test secret cleanup before and after integ tests are run
-    public class TestBase : IDisposable
+    public class TestBase : IAsyncLifetime
     {
         public static IAmazonSecretsManager Client = new AmazonSecretsManagerClient(Amazon.RegionEndpoint.USWest2);
         public static String TestSecretPrefix = "IntegTest";
         public static List<String> SecretNamesToDelete = new List<String>();
 
-        public TestBase()
+        public async Task InitializeAsync()
         {
-            FindPreviousTestSecrets();
-            DeleteSecrets(forceDelete: false);
+            await FindPreviousTestSecrets();
+            await DeleteSecrets(forceDelete: false);
         }
 
-        public void Dispose()
+        public async Task DisposeAsync()
         {
-            DeleteSecrets(forceDelete: true);
+            await DeleteSecrets(forceDelete: false);
         }
 
-        private async void FindPreviousTestSecrets()
+        private async Task FindPreviousTestSecrets()
         {
             String nextToken = null;
             var twoDaysAgo = DateTime.Now.AddDays(-2);
@@ -49,7 +49,7 @@
             } while (nextToken != null);
         }
 
-        private async void DeleteSecrets(bool forceDelete)
+        private async Task DeleteSecrets(bool forceDelete)
         {
             foreach (String secretName in SecretNamesToDelete)
             {
