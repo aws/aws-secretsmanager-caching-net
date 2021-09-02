@@ -36,7 +36,7 @@ jobs:
         with:
           dotnet-version: "2.1.x"
       - name: Install .NET Framework (add MSBuild to Path)
-        uses: warrenbuckley/Setup-MSBuild@v1
+        uses: microsoft/setup-msbuild@v1.0.3
 
       - name: Install dependencies
         run: dotnet restore
