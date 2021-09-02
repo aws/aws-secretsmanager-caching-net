@@ -45,7 +45,7 @@
                         SecretNamesToDelete.Add(secret.Name);
                     }
                 }
-                Thread.Sleep(1000);
+                // Thread.Sleep(1000);
             } while (nextToken != null);
         }
 
@@ -54,7 +54,7 @@
             foreach (String secretName in SecretNamesToDelete)
             {
                 await TestBase.Client.DeleteSecretAsync(new DeleteSecretRequest { SecretId = secretName, ForceDeleteWithoutRecovery = forceDelete });
-                Thread.Sleep(500);
+                // Thread.Sleep(500);
             }
             SecretNamesToDelete.Clear();
         }
@@ -92,7 +92,7 @@
         {
             String testSecretName = await Setup(TestType.SecretString);
             cache = new SecretsManagerCache(TestBase.Client);
-            Assert.Equal(cache.GetSecretString(testSecretName).Result, testSecretString);
+            Assert.Equal(await cache.GetSecretString(testSecretName), testSecretString);
         }
 
         [Fact]
@@ -100,16 +100,16 @@
         {
             String testSecretName = await Setup(TestType.SecretString);
             cache = new SecretsManagerCache(TestBase.Client, new SecretCacheConfiguration { CacheItemTTL = 1000 });
-            String originalSecretString = cache.GetSecretString(testSecretName).Result;
+            String originalSecretString = await cache.GetSecretString(testSecretName);
             await TestBase.Client.UpdateSecretAsync(new UpdateSecretRequest { SecretId = testSecretName, SecretString = System.Guid.NewGuid().ToString() });
 
             // Even though the secret is updated, the cached version should be retrieved
-            Assert.Equal(originalSecretString, cache.GetSecretString(testSecretName).Result);
+            Assert.Equal(originalSecretString, await cache.GetSecretString(testSecretName));
 
             Thread.Sleep(1000);
 
             // Cached secret string should be expired and the updated secret string retrieved
-            Assert.NotEqual(originalSecretString, cache.GetSecretString(testSecretName).Result);
+            Assert.NotEqual(originalSecretString, await cache.GetSecretString(testSecretName));
         }
 
         [Fact]
@@ -117,12 +117,12 @@
         {
             String testSecretName = await Setup(TestType.SecretString);
             cache = new SecretsManagerCache(TestBase.Client);
-            String originalSecretString = cache.GetSecretString(testSecretName).Result;
+            String originalSecretString = await cache.GetSecretString(testSecretName);
             await TestBase.Client.UpdateSecretAsync(new UpdateSecretRequest { SecretId = testSecretName, SecretString = System.Guid.NewGuid().ToString() });
 
-            Assert.Equal(originalSecretString, cache.GetSecretString(testSecretName).Result);
-            Assert.True(cache.RefreshNowAsync(testSecretName).Result);
-            Assert.NotEqual(originalSecretString, cache.GetSecretString(testSecretName).Result);
+            Assert.Equal(originalSecretString, await cache.GetSecretString(testSecretName));
+            Assert.True(await cache.RefreshNowAsync(testSecretName));
+            Assert.NotEqual(originalSecretString, await cache.GetSecretString(testSecretName));
         }
 
         [Fact]
@@ -130,7 +130,7 @@
         {
             String testSecretName = await Setup(TestType.SecretString);
             cache = new SecretsManagerCache(TestBase.Client);
-            Assert.Null(cache.GetSecretBinary(testSecretName).Result);
+            Assert.Null(await cache.GetSecretBinary(testSecretName));
         }
 
         [Fact]
@@ -138,7 +138,7 @@
         {
             String testSecretName = await Setup(TestType.SecretBinary);
             cache = new SecretsManagerCache(TestBase.Client);
-            Assert.Equal(cache.GetSecretBinary(testSecretName).Result, testSecretBinary.ToArray());
+            Assert.Equal(await cache.GetSecretBinary(testSecretName), testSecretBinary.ToArray());
         }
 
         [Fact]
@@ -146,7 +146,7 @@
         {
             String testSecretName = await Setup(TestType.SecretBinary);
             cache = new SecretsManagerCache(TestBase.Client);
-            Assert.Null(cache.GetSecretString(testSecretName).Result);
+            Assert.Null(await cache.GetSecretString(testSecretName));
         }
 
         [Fact]
@@ -155,7 +155,7 @@
             String testSecretName = await Setup(TestType.SecretString);
             TestHook testHook = new TestHook();
             cache = new SecretsManagerCache(TestBase.Client, new SecretCacheConfiguration { CacheHook = testHook });
-            String originalSecretString = cache.GetSecretString(testSecretName).Result;
+            String originalSecretString = await cache.GetSecretString(testSecretName);
         }
 
         class TestHook : ISecretCacheHook
