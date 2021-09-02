@@ -24,7 +24,7 @@
 
         public async Task DisposeAsync()
         {
-            await DeleteSecrets(forceDelete: false);
+            await DeleteSecrets(forceDelete: true);
         }
 
         private async Task FindPreviousTestSecrets()
