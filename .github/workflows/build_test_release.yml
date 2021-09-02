@@ -14,30 +14,36 @@ jobs:
     env:
       ACTIONS_ALLOW_UNSECURE_COMMANDS: true
     steps:
-      - uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v2
         with:
           fetch-depth: 0
-      - uses: actions/setup-dotnet@v1
+      - name: Install .NET 6.0
+        uses: actions/setup-dotnet@v1
         with:
-          dotnet-version: '6.0.x'
+          dotnet-version: "6.0.x"
           include-prerelease: true
-      - uses: actions/setup-dotnet@v1
+      - name: Install .NET 5.0
+        uses: actions/setup-dotnet@v1
         with:
-          dotnet-version: '5.0.x'
-      - uses: actions/setup-dotnet@v1
+          dotnet-version: "5.0.x"
+      - name: Install .NET Core 3.1
+        uses: actions/setup-dotnet@v1
         with:
-          dotnet-version: '3.1.x'
-      - uses: actions/setup-dotnet@v1
+          dotnet-version: "3.1.x"
+      - name: Install .NET Core 2.1
+        uses: actions/setup-dotnet@v1
         with:
-          dotnet-version: '2.1.x'
-      - uses: warrenbuckley/Setup-MSBuild@v1
+          dotnet-version: "2.1.x"
+      - name: Install .NET Framework (add MSBuild to Path)
+        uses: warrenbuckley/Setup-MSBuild@v1
 
       - name: Install dependencies
         run: dotnet restore
       - name: Build
         run: dotnet build --configuration Release --no-restore
         # Integration tests need AWS credentials
-      - name: "Configure AWS Credentials"
+      - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
