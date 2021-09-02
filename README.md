@@ -1,5 +1,7 @@
 # AWS Secrets Manager Caching Client for .NET
 
+![release](https://github.com/aws/aws-secretsmanager-caching-net/actions/workflows/build_test_release.yml/badge.svg)
+
 The AWS Secrets Manager caching client enables in-process caching of secrets for .NET applications.
 
 ## Required Prerequisites
