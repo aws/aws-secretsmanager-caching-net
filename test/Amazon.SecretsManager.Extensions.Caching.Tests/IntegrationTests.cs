@@ -45,7 +45,6 @@
                         SecretNamesToDelete.Add(secret.Name);
                     }
                 }
-                // Thread.Sleep(1000);
             } while (nextToken != null);
         }
 
@@ -54,7 +53,6 @@
             foreach (String secretName in SecretNamesToDelete)
             {
                 await TestBase.Client.DeleteSecretAsync(new DeleteSecretRequest { SecretId = secretName, ForceDeleteWithoutRecovery = forceDelete });
-                // Thread.Sleep(500);
             }
             SecretNamesToDelete.Clear();
         }
