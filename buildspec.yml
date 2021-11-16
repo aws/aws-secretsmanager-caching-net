@@ -4,5 +4,6 @@ phases:
   build:
     commands:
       - dotnet restore
-      - dotnet build
-      - dotnet test
+      - dotnet build -c Release --no-restore
+      - dotnet test -c Release --no-build
+      - dotnet pack -c Release --no-build
