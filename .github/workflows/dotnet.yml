@@ -30,4 +30,4 @@ jobs:
     - name: Build
       run: dotnet build --no-restore
     - name: Test
-      run: dotnet test --no-build --verbosity normal test/Amazon.SecretsManager.Extensions.Caching.Tests/CacheTests.cs
+      run: dotnet test --no-build --verbosity normal test/Amazon.SecretsManager.Extensions.Caching.UnitTests
