@@ -2,32 +2,39 @@ name: .NET
 
 on:
   push:
-    branches: [ master ]
+    branches: [master]
   pull_request:
-    branches: [ master ]
+    branches: [master]
 
 jobs:
   build:
-
     runs-on: windows-latest
 
     steps:
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-    - name: Install .NET 6.0
-      uses: actions/setup-dotnet@v1
-      with:
-        dotnet-version: "6.0.x"
-    - name: Install .NET Core 3.1
-      uses: actions/setup-dotnet@v1
-      with:
-        dotnet-version: "3.1.x"
-    - name: Install .NET Framework (add MSBuild to Path)
-      uses: microsoft/setup-msbuild@v1.0.3
+      - name: Install .NET 6.0
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: "6.0.x"
+      - name: Install .NET 5.0
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: "5.0.x"
+      - name: Install .NET Core 3.1
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: "3.1.x"
+      - name: Install .NET Core 2.1
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: "2.1.x"
+      - name: Install .NET Framework (add MSBuild to Path)
+        uses: microsoft/setup-msbuild@v1.1
 
-    - name: Restore dependencies
-      run: dotnet restore
-    - name: Build
-      run: dotnet build --no-restore
-    - name: Test
-      run: dotnet test --no-build --verbosity normal test/Amazon.SecretsManager.Extensions.Caching.UnitTests
+      - name: Restore dependencies
+        run: dotnet restore
+      - name: Build
+        run: dotnet build --no-restore
+      - name: Test
+        run: dotnet test --no-build --verbosity normal test/Amazon.SecretsManager.Extensions.Caching.UnitTests
