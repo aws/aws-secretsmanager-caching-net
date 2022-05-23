@@ -363,14 +363,20 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
             int retryCount = 10;
             String result = null;
             Exception ex = null;
+
+            // Intentionally not awaited
+            cache.GetSecretString("");
+
             for (int i = 0; i < retryCount; i++)
             {
                 try
                 {
-                    result = cache.GetSecretString("").Result;
+                    result = await cache.GetSecretString("");
                 }
-                catch (AggregateException exception) { ex = exception.InnerException; }
-                Assert.Equal("Expected exception 1", ex.Message);
+                catch (Exception exception)
+                {
+                    Assert.Equal("Expected exception 1", exception.Message);
+                }
             }
 
             // Wait for backoff interval before retrying to verify a retry is performed.
