@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Install .NET 6.0
+      - name: Install .NET
         uses: actions/setup-dotnet@v2
         with:
           dotnet-version: |
