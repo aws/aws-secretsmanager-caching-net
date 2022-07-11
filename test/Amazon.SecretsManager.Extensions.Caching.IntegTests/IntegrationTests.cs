@@ -1,4 +1,4 @@
-﻿namespace Amazon.SecretsManager.Extensions.Caching.Tests
+﻿namespace Amazon.SecretsManager.Extensions.Caching.IntegTests
 {
     using Xunit;
     using Amazon.SecretsManager.Model;
