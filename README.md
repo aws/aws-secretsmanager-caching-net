@@ -1,5 +1,8 @@
 # AWS Secrets Manager Caching Client for .NET
 
+[![.NET](https://github.com/aws/aws-secretsmanager-caching-net/actions/workflows/dotnet.yml/badge.svg?event=push)](https://github.com/aws/aws-secretsmanager-caching-net/actions/workflows/dotnet.yml)
+[![codecov](https://codecov.io/gh/aws/aws-secretsmanager-caching-net/branch/master/graph/badge.svg?token=cugbEh31cw)](https://codecov.io/gh/aws/aws-secretsmanager-caching-net)
+
 The AWS Secrets Manager caching client enables in-process caching of secrets for .NET applications.
 
 ## Required Prerequisites
