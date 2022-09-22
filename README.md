@@ -27,7 +27,7 @@ You can get the latest release from `Nuget`:
 
 ```xml
 <ItemGroup>
-     <PackageReference Include="AWSSDK.SecretsManager.Caching" Version="1.0.4" />
+     <PackageReference Include="AWSSDK.SecretsManager.Caching" Version="2.0.0" />
 </ItemGroup>
 ```
 
@@ -40,7 +40,7 @@ using System;
 using Amazon.SecretsManager.Extensions.Caching.SecretsManagerCache;
 
 namespace LambdaExample {
-    public class CachingExample 
+    public class CachingExample
     {
         private SecretsManagerCache cache = new SecretsManagerCache();
         private const String MySecretName = "MySecret";
@@ -54,8 +54,8 @@ namespace LambdaExample {
 }
 ```
 
-* After instantiating the cache, retrieve your secret using `GetSecretString` or `GetSecretBinary`. 
-* On successive retrievals, the cache will return the cached copy of the secret. 
+* After instantiating the cache, retrieve your secret using `GetSecretString` or `GetSecretBinary`.
+* On successive retrievals, the cache will return the cached copy of the secret.
 * Learn more about [AWS Lambda Function Handlers in C#](https://docs.aws.amazon.com/lambda/latest/dg/dotnet-programming-model-handler-types.html).
 
 ### Cache Configuration
@@ -71,7 +71,7 @@ You can configure the `SecretCacheConfiguration` object with the following param
 We use GitHub issues for tracking bugs and caching library feature requests and have limited bandwidth to address them. Please use these community resources for getting help:
 * Ask a question on [Stack Overflow](https://stackoverflow.com/) and tag it with [aws-secrets-manager](https://stackoverflow.com/questions/tagged/aws-secrets-manager).
 * Open a support ticket with [AWS Support](https://console.aws.amazon.com/support/home#/).
-* If it turns out that you may have found a bug, please [open an issue](https://github.com/aws/aws-secretsmanager-caching-csharp/issues/new). 
+* If it turns out that you may have found a bug, please [open an issue](https://github.com/aws/aws-secretsmanager-caching-csharp/issues/new).
 
 ## License
 
