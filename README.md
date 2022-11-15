@@ -28,7 +28,7 @@ You can get the latest release from `Nuget`:
 
 ```xml
 <ItemGroup>
-     <PackageReference Include="AWSSDK.SecretsManager.Caching" Version="1.0.4" />
+     <PackageReference Include="AWSSDK.SecretsManager.Caching" Version="1.0.5" />
 </ItemGroup>
 ```
 
