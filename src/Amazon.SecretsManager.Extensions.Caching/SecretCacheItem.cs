@@ -15,6 +15,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
 {
     using System;
     using System.Collections.Generic;
+    using System.Threading;
     using System.Threading.Tasks;
     using Amazon.SecretsManager.Model;
     using Microsoft.Extensions.Caching.Memory;
@@ -37,22 +38,22 @@ namespace Amazon.SecretsManager.Extensions.Caching
         /// Asynchronously retrieves the most current DescribeSecretResponse from Secrets Manager
         /// as part of the Refresh operation.
         /// </summary>
-        protected override async Task<DescribeSecretResponse> ExecuteRefreshAsync()
+        protected override async Task<DescribeSecretResponse> ExecuteRefreshAsync(CancellationToken cancellationToken = default)
         {
-            return await client.DescribeSecretAsync(new DescribeSecretRequest { SecretId = secretId });
+            return await client.DescribeSecretAsync(new DescribeSecretRequest { SecretId = secretId }, cancellationToken);
         }
 
         /// <summary>
         /// Asynchronously retrieves the GetSecretValueResponse from the proper SecretCacheVersion.
         /// </summary>
-        protected override async Task<GetSecretValueResponse> GetSecretValueAsync(DescribeSecretResponse result)
+        protected override async Task<GetSecretValueResponse> GetSecretValueAsync(DescribeSecretResponse result, CancellationToken cancellationToken = default)
         {
             SecretCacheVersion version = GetVersion(result);
             if (version == null)
             {
                 return null;
             }
-            return await version.GetSecretValue();
+            return await version.GetSecretValue(cancellationToken);
         }
 
         public override int GetHashCode()

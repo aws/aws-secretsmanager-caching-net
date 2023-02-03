@@ -15,6 +15,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
 {
 
     using System;
+    using System.Threading;
     using System.Threading.Tasks;
 
     /// <summary>
@@ -32,18 +33,18 @@ namespace Amazon.SecretsManager.Extensions.Caching
         /// <summary>
         /// Asynchronously retrieves the specified SecretBinary after calling <see cref="GetCachedSecret"/>.
         /// </summary>
-        Task<byte[]> GetSecretBinary(string secretId);
+        Task<byte[]> GetSecretBinary(string secretId, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Asynchronously retrieves the specified SecretString after calling <see cref="GetCachedSecret"/>.
         /// </summary>
-        Task<string> GetSecretString(string secretId);
+        Task<string> GetSecretString(string secretId, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Requests the secret value from SecretsManager asynchronously and updates the cache entry with any changes.
         /// If there is no existing cache entry, a new one is created.
         /// Returns true or false depending on if the refresh is successful.
         /// </summary>
-        Task<bool> RefreshNowAsync(string secretId);
+        Task<bool> RefreshNowAsync(string secretId, CancellationToken cancellationToken = default);
     }
 }
