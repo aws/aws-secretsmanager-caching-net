@@ -15,6 +15,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
 {
     using Amazon.SecretsManager.Model;
     using System;
+    using System.Threading;
     using System.Threading.Tasks;
 
     class SecretCacheVersion : SecretCacheObject<GetSecretValueResponse>
@@ -50,12 +51,12 @@ namespace Amazon.SecretsManager.Extensions.Caching
         /// Asynchronously retrieves the most current GetSecretValueResponse from Secrets Manager
         /// as part of the Refresh operation.
         /// </summary>
-        protected override async Task<GetSecretValueResponse> ExecuteRefreshAsync()
+        protected override async Task<GetSecretValueResponse> ExecuteRefreshAsync(CancellationToken cancellationToken = default)
         {
-            return await this.client.GetSecretValueAsync(new GetSecretValueRequest { SecretId = this.secretId, VersionId = this.versionId });
+            return await this.client.GetSecretValueAsync(new GetSecretValueRequest { SecretId = this.secretId, VersionId = this.versionId }, cancellationToken);
         }
 
-        protected override Task<GetSecretValueResponse> GetSecretValueAsync(GetSecretValueResponse result)
+        protected override Task<GetSecretValueResponse> GetSecretValueAsync(GetSecretValueResponse result, CancellationToken cancellationToken = default)
         {
             return Task.FromResult(result);
         }
