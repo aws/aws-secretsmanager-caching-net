@@ -73,7 +73,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
 
         private void ServiceClientBeforeRequestEvent(object sender, RequestEventArgs e)
         {
-            if (e is WebServiceRequestEventArgs args && args.Headers.ContainsKey(VersionInfo.USER_AGENT_HEADER))
+            if (e is WebServiceRequestEventArgs args && args.Headers.ContainsKey(VersionInfo.USER_AGENT_HEADER) && !args.Headers[VersionInfo.USER_AGENT_HEADER].Contains(VersionInfo.USER_AGENT_STRING))
                 args.Headers[VersionInfo.USER_AGENT_HEADER] = String.Format("{0}/{1}", args.Headers[VersionInfo.USER_AGENT_HEADER], VersionInfo.USER_AGENT_STRING);
         }
 
