@@ -11,7 +11,7 @@ The AWS Secrets Manager caching client enables in-process caching of secrets for
 To use this client, you must have:
 
 * A .NET project with one of the following:
-    * .NET Framework 4.6.1 or higher
+    * .NET Framework 4.6.2 or higher
     * .NET Standard 2.0 or higher
 
 * An Amazon Web Services (AWS) account to access secrets stored in AWS Secrets Manager and use AWS SDK for .NET.
