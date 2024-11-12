@@ -20,7 +20,8 @@ jobs:
             8
       - name: Install .NET Framework (add MSBuild to Path)
         uses: microsoft/setup-msbuild@v2
-
+        with:
+          msbuild-architecture: x64
       - name: Restore dependencies
         run: dotnet restore
       - name: Build
