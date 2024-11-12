@@ -357,7 +357,6 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
                 }
                 catch (AmazonServiceException)
                 {
-                    return;
                 }
             }
 
