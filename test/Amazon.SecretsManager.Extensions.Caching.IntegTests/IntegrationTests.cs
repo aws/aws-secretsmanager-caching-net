@@ -86,7 +86,7 @@
         }
 
         [Fact]
-        public async void GetSecretStringTest()
+        public async Task GetSecretStringTest()
         {
             String testSecretName = await Setup(TestType.SecretString);
             cache = new SecretsManagerCache(TestBase.Client);
@@ -94,7 +94,7 @@
         }
 
         [Fact]
-        public async void SecretCacheTTLTest()
+        public async Task SecretCacheTTLTest()
         {
             String testSecretName = await Setup(TestType.SecretString);
             cache = new SecretsManagerCache(TestBase.Client, new SecretCacheConfiguration { CacheItemTTL = 1000 });
@@ -111,7 +111,7 @@
         }
 
         [Fact]
-        public async void SecretCacheRefreshTest()
+        public async Task SecretCacheRefreshTest()
         {
             String testSecretName = await Setup(TestType.SecretString);
             cache = new SecretsManagerCache(TestBase.Client);
@@ -124,7 +124,7 @@
         }
 
         [Fact]
-        public async void NoSecretBinaryTest()
+        public async Task NoSecretBinaryTest()
         {
             String testSecretName = await Setup(TestType.SecretString);
             cache = new SecretsManagerCache(TestBase.Client);
@@ -132,7 +132,7 @@
         }
 
         [Fact]
-        public async void GetSecretBinaryTest()
+        public async Task GetSecretBinaryTest()
         {
             String testSecretName = await Setup(TestType.SecretBinary);
             cache = new SecretsManagerCache(TestBase.Client);
@@ -140,7 +140,7 @@
         }
 
         [Fact]
-        public async void NoSecretStringTest()
+        public async Task NoSecretStringTest()
         {
             String testSecretName = await Setup(TestType.SecretBinary);
             cache = new SecretsManagerCache(TestBase.Client);
@@ -148,7 +148,7 @@
         }
 
         [Fact]
-        public async void CacheHookTest()
+        public async Task CacheHookTest()
         {
             String testSecretName = await Setup(TestType.SecretString);
             TestHook testHook = new TestHook();

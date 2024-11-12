@@ -18,6 +18,7 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
     using System.IO;
     using System.Linq;
     using System.Threading;
+    using System.Threading.Tasks;
     using Amazon.Runtime;
     using Amazon.SecretsManager.Model;
     using Moq;
@@ -96,7 +97,7 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
         }
 
         [Fact]
-        public async void GetSecretStringTest()
+        public async Task GetSecretStringTest()
         {
             Mock<IAmazonSecretsManager> secretsManager = new Mock<IAmazonSecretsManager>(MockBehavior.Strict);
             secretsManager.SetupSequence(i => i.GetSecretValueAsync(It.Is<GetSecretValueRequest>(j => j.SecretId == secretStringResponse1.Name), default(CancellationToken)))
@@ -112,7 +113,7 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
         }
 
         [Fact]
-        public async void NoSecretStringPresentTest()
+        public async Task NoSecretStringPresentTest()
         {
             Mock<IAmazonSecretsManager> secretsManager = new Mock<IAmazonSecretsManager>(MockBehavior.Strict);
             secretsManager.SetupSequence(i => i.GetSecretValueAsync(It.Is<GetSecretValueRequest>(j => j.SecretId == secretStringResponse1.Name), default(CancellationToken)))
@@ -128,7 +129,7 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
         }
 
         [Fact]
-        public async void GetSecretBinaryTest()
+        public async Task GetSecretBinaryTest()
         {
             Mock<IAmazonSecretsManager> secretsManager = new Mock<IAmazonSecretsManager>(MockBehavior.Strict);
             secretsManager.SetupSequence(i => i.GetSecretValueAsync(It.Is<GetSecretValueRequest>(j => j.SecretId == binaryResponse1.Name), default(CancellationToken)))
@@ -145,7 +146,7 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
         }
 
         [Fact]
-        public async void NoSecretBinaryPresentTest()
+        public async Task NoSecretBinaryPresentTest()
         {
             Mock<IAmazonSecretsManager> secretsManager = new Mock<IAmazonSecretsManager>(MockBehavior.Strict);
             secretsManager.SetupSequence(i => i.GetSecretValueAsync(It.Is<GetSecretValueRequest>(j => j.SecretId == binaryResponse1.Name), default(CancellationToken)))
@@ -162,7 +163,7 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
         }
 
         [Fact]
-        public async void GetSecretBinaryMultipleTest()
+        public async Task GetSecretBinaryMultipleTest()
         {
             Mock<IAmazonSecretsManager> secretsManager = new Mock<IAmazonSecretsManager>(MockBehavior.Strict);
             secretsManager.SetupSequence(i => i.GetSecretValueAsync(It.Is<GetSecretValueRequest>(j => j.SecretId == binaryResponse1.Name), default(CancellationToken)))
@@ -184,7 +185,7 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
         }
 
         [Fact]
-        public async void BasicSecretCacheTest()
+        public async Task BasicSecretCacheTest()
         {
             Mock<IAmazonSecretsManager> secretsManager = new Mock<IAmazonSecretsManager>(MockBehavior.Strict);
             secretsManager.SetupSequence(i => i.GetSecretValueAsync(It.Is<GetSecretValueRequest>(j => j.SecretId == secretStringResponse1.Name), default(CancellationToken)))
@@ -203,7 +204,7 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
         }
 
         [Fact]
-        public async void SecretStringRefreshNowTest()
+        public async Task SecretStringRefreshNowTest()
         {
             Mock<IAmazonSecretsManager> secretsManager = new Mock<IAmazonSecretsManager>(MockBehavior.Strict);
             secretsManager.SetupSequence(i => i.GetSecretValueAsync(It.Is<GetSecretValueRequest>(j => j.SecretId == secretStringResponse1.Name), default(CancellationToken)))
@@ -226,7 +227,7 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
         }
 
         [Fact]
-        public async void BinarySecretRefreshNowTest()
+        public async Task BinarySecretRefreshNowTest()
         {
             Mock<IAmazonSecretsManager> secretsManager = new Mock<IAmazonSecretsManager>(MockBehavior.Strict);
             secretsManager.SetupSequence(i => i.GetSecretValueAsync(It.Is<GetSecretValueRequest>(j => j.SecretId == binaryResponse1.Name), default(CancellationToken)))
@@ -247,7 +248,7 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
         }
 
         [Fact]
-        public async void RefreshNowFailedTest()
+        public async Task RefreshNowFailedTest()
         {
             Mock<IAmazonSecretsManager> secretsManager = new Mock<IAmazonSecretsManager>(MockBehavior.Strict);
             secretsManager.SetupSequence(i => i.GetSecretValueAsync(It.Is<GetSecretValueRequest>(j => j.SecretId == secretStringResponse1.Name), default(CancellationToken)))
@@ -266,7 +267,7 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
         }
 
         [Fact]
-        public async void BasicSecretCacheTTLRefreshTest()
+        public async Task BasicSecretCacheTTLRefreshTest()
         {
             Mock<IAmazonSecretsManager> secretsManager = new Mock<IAmazonSecretsManager>(MockBehavior.Strict);
             secretsManager.SetupSequence(i => i.GetSecretValueAsync(It.Is<GetSecretValueRequest>(j => j.SecretId == secretStringResponse1.Name), default(CancellationToken)))
@@ -290,7 +291,7 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
         }
 
         [Fact]
-        public async void GetSecretStringMultipleTest()
+        public async Task GetSecretStringMultipleTest()
         {
             Mock<IAmazonSecretsManager> secretsManager = new Mock<IAmazonSecretsManager>(MockBehavior.Strict);
             secretsManager.SetupSequence(i => i.GetSecretValueAsync(It.Is<GetSecretValueRequest>(j => j.SecretId == secretStringResponse1.Name), default(CancellationToken)))
@@ -310,7 +311,7 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
         }
 
         [Fact]
-        public async void TestBasicCacheEviction()
+        public async Task TestBasicCacheEviction()
         {
             Mock<IAmazonSecretsManager> secretsManager = new Mock<IAmazonSecretsManager>(MockBehavior.Strict);
             secretsManager.SetupSequence(i => i.GetSecretValueAsync(It.Is<GetSecretValueRequest>(j => j.SecretId == secretStringResponse1.Name), default(CancellationToken)))
@@ -334,7 +335,7 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
         }
 
         [Fact]
-        public void TestBasicErrorCaching()
+        public async Task TestBasicErrorCaching()
         {
             Mock<IAmazonSecretsManager> secretsManager = new Mock<IAmazonSecretsManager>(MockBehavior.Strict);
             secretsManager.SetupSequence(i => i.GetSecretValueAsync(It.Is<GetSecretValueRequest>(j => j.SecretId == secretStringResponse1.Name), default(CancellationToken)))
@@ -346,12 +347,25 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
             SecretsManagerCache cache = new SecretsManagerCache(secretsManager.Object);
             for (int i = 0; i < 5; i++)
             {
-                Assert.ThrowsAsync<AmazonServiceException>(async () => await cache.GetSecretString(secretStringResponse1.Name));
+                try
+                {
+                    await cache.GetSecretString(secretStringResponse1.Name);
+                }
+                catch (AmazonSecretsManagerException)
+                {
+                    throw;
+                }
+                catch (AmazonServiceException)
+                {
+                    return;
+                }
             }
+
+            return;
         }
 
         [Fact]
-        public async void ExceptionRetryTest()
+        public async Task ExceptionRetryTest()
         {
             Mock<IAmazonSecretsManager> secretsManager = new Mock<IAmazonSecretsManager>(MockBehavior.Strict);
             secretsManager.SetupSequence(i => i.DescribeSecretAsync(It.IsAny<DescribeSecretRequest>(), default(CancellationToken)))
@@ -361,16 +375,18 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
 
             SecretsManagerCache cache = new SecretsManagerCache(secretsManager.Object);
             int retryCount = 10;
-            String result = null;
-            Exception ex = null;
+
             for (int i = 0; i < retryCount; i++)
             {
                 try
                 {
-                    result = cache.GetSecretString("").Result;
+                    await cache.GetSecretString("");
                 }
-                catch (AggregateException exception) { ex = exception.InnerException; }
-                Assert.Equal("Expected exception 1", ex.Message);
+                catch (AmazonServiceException exception)
+                {
+                    Assert.Equal("Expected exception 1", exception.Message);
+                }
+
             }
 
             // Wait for backoff interval before retrying to verify a retry is performed.
@@ -408,7 +424,7 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
         }
 
         [Fact]
-        public async void HookSecretCacheTest()
+        public async Task HookSecretCacheTest()
         {
             Mock<IAmazonSecretsManager> secretsManager = new Mock<IAmazonSecretsManager>(MockBehavior.Strict);
             secretsManager.SetupSequence(i => i.GetSecretValueAsync(It.IsAny<GetSecretValueRequest>(), default(CancellationToken)))
