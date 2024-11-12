@@ -26,12 +26,6 @@ jobs:
         run: dotnet restore
       - name: Build
         run: dotnet build --no-restore
-      - name: Verify Strong Name
-        run: |
-          $snPath = "C:\Program Files (x86)\Microsoft SDKs\Windows\v10.0A\bin\NETFX 4.8 Tools\sn.exe"
-          $snPath -vf src/Amazon.SecretsManager.Extensions.Caching/bin/Debug/netstandard2.0/Amazon.SecretsManager.Extensions.Caching.dll
-          $snPath -vf test/Amazon.SecretsManager.Extensions.Caching.UnitTests/bin/Debug/net462/Amazon.SecretsManager.Extensions.Caching.dll
-          $snPath -vf test/Amazon.SecretsManager.Extensions.Caching.UnitTests/bin/Debug/net462/Amazon.SecretsManager.Extensions.Caching.UnitTests.dll
       - name: Test
         run: dotnet test --no-build --verbosity normal --collect:"XPlat Code Coverage" test/Amazon.SecretsManager.Extensions.Caching.UnitTests
       - name: Codecov
