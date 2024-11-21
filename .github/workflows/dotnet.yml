@@ -11,24 +11,28 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install .NET
-        uses: actions/setup-dotnet@v3
+        uses: actions/setup-dotnet@v4
         with:
           dotnet-version: |
-            7
-            6
+            8
       - name: Install .NET Framework (add MSBuild to Path)
-        uses: microsoft/setup-msbuild@v1.3
-
+        uses: microsoft/setup-msbuild@v2
+        with:
+          msbuild-architecture: x64
       - name: Restore dependencies
         run: dotnet restore
       - name: Build
         run: dotnet build --no-restore
       - name: Test
-        run: dotnet test --no-build --verbosity normal --collect:"XPlat Code Coverage" test/Amazon.SecretsManager.Extensions.Caching.UnitTests
+        # Strong name requires disabling xUnit app domains in order to get coverage using coverlet
+        # https://github.com/MarcoRossignoli/coverlet/blob/master/Documentation/KnownIssues.md#tests-fail-if-assembly-is-strong-named
+        run: dotnet test --no-build --verbosity normal --collect:"XPlat Code Coverage" test/Amazon.SecretsManager.Extensions.Caching.UnitTests -- RunConfiguration.DisableAppDomain=true
       - name: Codecov
-        uses: codecov/codecov-action@v3.1.4
+        uses: codecov/codecov-action@v4
         with:
           directory: test/Amazon.SecretsManager.Extensions.Caching.UnitTests/TestResults
+        env:
+          CODECOV_TOKEN: #{{ secrets.CODECOV_TOKEN }}
