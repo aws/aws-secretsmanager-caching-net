@@ -31,7 +31,7 @@ jobs:
         # https://github.com/MarcoRossignoli/coverlet/blob/master/Documentation/KnownIssues.md#tests-fail-if-assembly-is-strong-named
         run: dotnet test --no-build --verbosity normal --collect:"XPlat Code Coverage" test/Amazon.SecretsManager.Extensions.Caching.UnitTests -- RunConfiguration.DisableAppDomain=true
       - name: Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           directory: test/Amazon.SecretsManager.Extensions.Caching.UnitTests/TestResults
         env:
