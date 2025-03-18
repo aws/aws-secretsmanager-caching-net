@@ -1,6 +1,8 @@
 # AWS Secrets Manager Caching Client for .NET
 
-[![NuGet](https://www.fuget.org/packages/AWSSDK.SecretsManager.Caching/badge.svg)](https://www.nuget.org/packages/AWSSDK.SecretsManager.Caching)
+
+
+[![NuGet](https://img.shields.io/nuget/v/AWSSDK.SecretsManager.Caching)](https://www.nuget.org/packages/AWSSDK.SecretsManager.Caching)
 [![.NET](https://github.com/aws/aws-secretsmanager-caching-net/actions/workflows/dotnet.yml/badge.svg?event=push)](https://github.com/aws/aws-secretsmanager-caching-net/actions/workflows/dotnet.yml)
 [![codecov](https://codecov.io/gh/aws/aws-secretsmanager-caching-net/branch/master/graph/badge.svg?token=cugbEh31cw)](https://codecov.io/gh/aws/aws-secretsmanager-caching-net)
 
