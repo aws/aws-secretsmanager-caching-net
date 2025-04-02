@@ -86,24 +86,36 @@ namespace Amazon.SecretsManager.Extensions.Caching
         }
 
         /// <summary>
-        /// Asynchronously retrieves the specified SecretString after calling <see cref="GetCachedSecret"/>.
+        /// Asynchronously retrieves the specified <c>SecretString</c> after calling <see cref="GetCachedSecret"/>.
+        /// If both <c>versionId</c> and <c>versionStage</c> are specified, <c>versionId</c> takes precedence.
         /// </summary>
-        public async Task<String> GetSecretString(String secretId, CancellationToken cancellationToken = default)
+        /// <param name="secretId">The secret identifier. This can be the full ARN or the friendly name for the secret.</param>
+        /// <param name="versionId">The version identifier.</param>
+        /// <param name="versionStage">The version stage.</param>
+        /// <param name="cancellationToken">The cancellation token used for the Secrets Manager API call.</param>
+        /// <returns>The <c>SecretString</c>.</returns>
+        public async Task<String> GetSecretString(String secretId, string versionId = "", string versionStage = "", CancellationToken cancellationToken = default)
         {
             SecretCacheItem secret = GetCachedSecret(secretId);
             GetSecretValueResponse response = null;
-            response = await secret.GetSecretValue(cancellationToken);
+            response = await secret.GetSecretValue(cancellationToken, versionId, versionStage);
             return response?.SecretString;
         }
 
         /// <summary>
-        /// Asynchronously retrieves the specified SecretBinary after calling <see cref="GetCachedSecret"/>.
+        /// Asynchronously retrieves the specified <c>SecretBinary</c> after calling <see cref="GetCachedSecret"/>.
+        /// If both <c>versionId</c> and <c>versionStage</c> are specified, <c>versionId</c> takes precedence.
         /// </summary>
-        public async Task<byte[]> GetSecretBinary(String secretId, CancellationToken cancellationToken = default)
+        /// <param name="secretId">The secret identifier. This can be the full ARN or the friendly name for the secret.</param>
+        /// <param name="versionId">The version identifier.</param>
+        /// <param name="versionStage">The version stage.</param>
+        /// <param name="cancellationToken">The cancellation token used for the Secrets Manager API call.</param>
+        /// <returns>The <c>SecretBinary</c>.</returns>
+        public async Task<byte[]> GetSecretBinary(String secretId, string versionId = "", string versionStage = "", CancellationToken cancellationToken = default)
         {
             SecretCacheItem secret = GetCachedSecret(secretId);
             GetSecretValueResponse response = null;
-            response = await secret.GetSecretValue(cancellationToken);
+            response = await secret.GetSecretValue(cancellationToken, versionId, versionStage);
             return response?.SecretBinary?.ToArray();
         }
 

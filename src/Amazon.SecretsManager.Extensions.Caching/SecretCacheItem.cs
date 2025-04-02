@@ -25,15 +25,15 @@ namespace Amazon.SecretsManager.Extensions.Caching
     /// </summary>
     public class SecretCacheItem : SecretCacheObject<DescribeSecretResponse>
     {
-        /// The cached secret value versions for this cached secret. 
+        /// The cached secret value versions for this cached secret.
         private readonly MemoryCache versions = new MemoryCache(new MemoryCacheOptions());
         private const ushort MAX_VERSIONS_CACHE_SIZE = 10;
-        
+
         public SecretCacheItem(String secretId, IAmazonSecretsManager client, SecretCacheConfiguration config)
             : base(secretId, client, config)
         {
         }
-        
+
         /// <summary>
         /// Asynchronously retrieves the most current DescribeSecretResponse from Secrets Manager
         /// as part of the Refresh operation.
@@ -46,9 +46,9 @@ namespace Amazon.SecretsManager.Extensions.Caching
         /// <summary>
         /// Asynchronously retrieves the GetSecretValueResponse from the proper SecretCacheVersion.
         /// </summary>
-        protected override async Task<GetSecretValueResponse> GetSecretValueAsync(DescribeSecretResponse result, CancellationToken cancellationToken = default)
+        protected override async Task<GetSecretValueResponse> GetSecretValueAsync(DescribeSecretResponse result, string versionId = "", string versionStage = "", CancellationToken cancellationToken = default)
         {
-            SecretCacheVersion version = GetVersion(result);
+            SecretCacheVersion version = GetVersion(result, versionId, versionStage);
             if (version == null)
             {
                 return null;
@@ -75,13 +75,19 @@ namespace Amazon.SecretsManager.Extensions.Caching
         /// Retrieves the SecretCacheVersion corresponding to the Version Stage
         /// specified by the SecretCacheConfiguration.
         /// </summary>
-        private SecretCacheVersion GetVersion(DescribeSecretResponse describeResult)
+        private SecretCacheVersion GetVersion(DescribeSecretResponse describeResult, string versionId = "", string versionStage = "")
         {
             if (null == describeResult?.VersionIdsToStages) return null;
             String currentVersionId = null;
             foreach (KeyValuePair<String, List<String>> entry in describeResult.VersionIdsToStages)
             {
-                if (entry.Value.Contains(config.VersionStage))
+                if (versionId != string.Empty && entry.Key.Equals(versionId))
+                {
+                    currentVersionId = versionId;
+                    break;
+                }
+
+                if ((versionStage != string.Empty && entry.Value.Contains(versionStage)) || entry.Value.Contains(config.VersionStage))
                 {
                     currentVersionId = entry.Key;
                     break;

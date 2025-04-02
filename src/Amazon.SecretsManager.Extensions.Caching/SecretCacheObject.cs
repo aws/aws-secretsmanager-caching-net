@@ -22,20 +22,20 @@ namespace Amazon.SecretsManager.Extensions.Caching
 
     public abstract class SecretCacheObject<T>
     {
-        /// The number of milliseconds to wait after an exception. 
+        /// The number of milliseconds to wait after an exception.
         private const long EXCEPTION_BACKOFF = 1000;
 
-        /// The growth factor of the backoff duration. 
+        /// The growth factor of the backoff duration.
         private const long EXCEPTION_BACKOFF_GROWTH_FACTOR = 2;
-        
+
         /// The maximum number of milliseconds to wait before retrying a failed
         /// request.
         private const long BACKOFF_PLATEAU = 128 * EXCEPTION_BACKOFF;
 
-        private JitteredDelay EXCEPTION_JITTERED_DELAY = new JitteredDelay(TimeSpan.FromMilliseconds(EXCEPTION_BACKOFF), 
-                                                                    TimeSpan.FromMilliseconds(EXCEPTION_BACKOFF), 
+        private JitteredDelay EXCEPTION_JITTERED_DELAY = new JitteredDelay(TimeSpan.FromMilliseconds(EXCEPTION_BACKOFF),
+                                                                    TimeSpan.FromMilliseconds(EXCEPTION_BACKOFF),
                                                                     TimeSpan.FromMilliseconds(BACKOFF_PLATEAU));
-        
+
         /// When forcing a refresh using the refreshNow method, a random sleep
         /// will be performed using this value.  This helps prevent code from
         /// executing a refreshNow in a continuous loop without waiting.
@@ -45,35 +45,35 @@ namespace Amazon.SecretsManager.Extensions.Caching
         private JitteredDelay FORCE_REFRESH_JITTERED_DELAY = new JitteredDelay(TimeSpan.FromMilliseconds(FORCE_REFRESH_JITTER_BASE_INCREMENT),
                                                                         TimeSpan.FromMilliseconds(FORCE_REFRESH_JITTER_VARIANCE));
 
-        /// The secret identifier for this cached object. 
+        /// The secret identifier for this cached object.
         protected String secretId;
 
-        /// A private object to synchronize access to certain methods. 
+        /// A private object to synchronize access to certain methods.
         protected static readonly SemaphoreSlim Lock = new SemaphoreSlim(1,1);
 
-        /// The AWS Secrets Manager client to use for requesting secrets. 
+        /// The AWS Secrets Manager client to use for requesting secrets.
         protected IAmazonSecretsManager client;
 
         /// The Secret Cache Configuration.
         protected SecretCacheConfiguration config;
 
-        /// A flag to indicate a refresh is needed. 
+        /// A flag to indicate a refresh is needed.
         private bool refreshNeeded = true;
 
         /// The result of the last AWS Secrets Manager request for this item.
         private Object data = null;
-        
+
         /// If the last request to AWS Secrets Manager resulted in an exception,
         /// that exception will be thrown back to the caller when requesting
         /// secret data.
         protected Exception exception = null;
 
-       
+
         /// The number of exceptions encountered since the last successfully
         /// AWS Secrets Manager request.  This is used to calculate an exponential
         /// backoff.
         private long exceptionCount = 0;
-        
+
         /// The time to wait before retrying a failed AWS Secrets Manager request.
         private long nextRetryTime = 0;
 
@@ -93,10 +93,10 @@ namespace Amazon.SecretsManager.Extensions.Caching
             this.client = client;
             this.config = config;
         }
-     
+
         protected abstract Task<T> ExecuteRefreshAsync(CancellationToken cancellationToken = default);
 
-        protected abstract Task<GetSecretValueResponse> GetSecretValueAsync(T result, CancellationToken cancellationToken = default);
+        protected abstract Task<GetSecretValueResponse> GetSecretValueAsync(T result, string versionId = "", string versionStage = "", CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Return the typed result object.
@@ -209,7 +209,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
         /// If the secret is due for a refresh, the refresh will occur before the result is returned.
         /// If the refresh fails, the cached result is returned, or the cached exception is thrown.
         /// </summary>
-        public async Task<GetSecretValueResponse> GetSecretValue(CancellationToken cancellationToken)
+        public async Task<GetSecretValueResponse> GetSecretValue(CancellationToken cancellationToken, string versionId = "", string versionStage = "")
         {
             bool success = false;
             await Lock.WaitAsync(cancellationToken);
@@ -226,7 +226,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
             {
                 System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(exception).Throw();
             }
-            return await GetSecretValueAsync(GetResult(), cancellationToken);
+            return await GetSecretValueAsync(GetResult(), versionId, versionStage, cancellationToken);
         }
     }
 }
