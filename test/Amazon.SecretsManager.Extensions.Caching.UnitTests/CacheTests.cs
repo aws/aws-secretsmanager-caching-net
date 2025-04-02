@@ -28,6 +28,7 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
     {
         private const string AWSCURRENT_VERSIONID_1 = "01234567890123456789012345678901";
         private const string AWSCURRENT_VERSIONID_2 = "12345678901234567890123456789012";
+        private const string AWSCURRENT_VERSIONID_3 = "23456789012345678901234567890123";
 
         private readonly GetSecretValueResponse secretStringResponse1 = new GetSecretValueResponse
         {
@@ -57,6 +58,13 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
             SecretString = "AnotherSecretValue"
         };
 
+        private readonly GetSecretValueResponse secretStringResponse5 = new GetSecretValueResponse
+        {
+            Name = "MySecretString",
+            VersionId = AWSCURRENT_VERSIONID_3,
+            SecretString = "MySecretValue5",
+        };
+
         private readonly GetSecretValueResponse binaryResponse1 = new GetSecretValueResponse
         {
             Name = "MyBinarySecret",
@@ -71,10 +79,18 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
             SecretBinary = new MemoryStream(Enumerable.Repeat((byte)0x30, 10).ToArray())
         };
 
+        private readonly GetSecretValueResponse binaryResponse3 = new GetSecretValueResponse
+        {
+            Name = "MyBinarySecret",
+            VersionId = AWSCURRENT_VERSIONID_3,
+            SecretBinary = new MemoryStream(Enumerable.Repeat((byte)0x20, 10).ToArray())
+        };
+
         private readonly DescribeSecretResponse describeSecretResponse1 = new DescribeSecretResponse()
         {
             VersionIdsToStages = new Dictionary<string, List<string>> {
-                { AWSCURRENT_VERSIONID_1, new List<String> { "AWSCURRENT" } }
+                { AWSCURRENT_VERSIONID_1, new List<String> { "AWSCURRENT" } },
+                { AWSCURRENT_VERSIONID_3, new List<String> { "AWSPREVIOUS" } }
             }
         };
 
@@ -113,6 +129,38 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
         }
 
         [Fact]
+        public async Task GetSecretStringVersionIdTest()
+        {
+            Mock<IAmazonSecretsManager> secretsManager = new Mock<IAmazonSecretsManager>(MockBehavior.Strict);
+            secretsManager.SetupSequence(i => i.GetSecretValueAsync(It.Is<GetSecretValueRequest>(j => j.SecretId == secretStringResponse1.Name), default(CancellationToken)))
+                .ReturnsAsync(secretStringResponse1)
+                .ThrowsAsync(new AmazonSecretsManagerException("This should not be called"));
+            secretsManager.SetupSequence(i => i.DescribeSecretAsync(It.Is<DescribeSecretRequest>(j => j.SecretId == secretStringResponse1.Name), default(CancellationToken)))
+                .ReturnsAsync(describeSecretResponse1)
+                .ThrowsAsync(new AmazonSecretsManagerException("This should not be called"));
+
+            SecretsManagerCache cache = new SecretsManagerCache(secretsManager.Object);
+            string first = await cache.GetSecretString(secretStringResponse3.Name, secretStringResponse3.VersionId);
+            Assert.Equal(first, secretStringResponse3.SecretString);
+        }
+
+        [Fact]
+        public async Task GetSecretStringVersionStageTest()
+        {
+            Mock<IAmazonSecretsManager> secretsManager = new Mock<IAmazonSecretsManager>(MockBehavior.Strict);
+            secretsManager.SetupSequence(i => i.GetSecretValueAsync(It.Is<GetSecretValueRequest>(j => j.SecretId == secretStringResponse5.Name), default(CancellationToken)))
+                .ReturnsAsync(secretStringResponse5)
+                .ThrowsAsync(new AmazonSecretsManagerException("This should not be called"));
+            secretsManager.SetupSequence(i => i.DescribeSecretAsync(It.Is<DescribeSecretRequest>(j => j.SecretId == secretStringResponse5.Name), default(CancellationToken)))
+                .ReturnsAsync(describeSecretResponse1)
+                .ThrowsAsync(new AmazonSecretsManagerException("This should not be called"));
+
+            SecretsManagerCache cache = new SecretsManagerCache(secretsManager.Object);
+            string first = await cache.GetSecretString(secretStringResponse5.Name, "", "AWSPREVIOUS");
+            Assert.Equal(first, secretStringResponse5.SecretString);
+        }
+
+        [Fact]
         public async Task NoSecretStringPresentTest()
         {
             Mock<IAmazonSecretsManager> secretsManager = new Mock<IAmazonSecretsManager>(MockBehavior.Strict);
@@ -140,9 +188,43 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
                 .ThrowsAsync(new AmazonSecretsManagerException("This should not be called"));
 
             SecretsManagerCache cache = new SecretsManagerCache(secretsManager.Object);
-            
+
             byte[] first = await cache.GetSecretBinary(binaryResponse1.Name);
             Assert.Equal(first, binaryResponse1.SecretBinary.ToArray());
+        }
+
+        [Fact]
+        public async Task GetSecretBinaryVersionIdTest()
+        {
+            Mock<IAmazonSecretsManager> secretsManager = new Mock<IAmazonSecretsManager>(MockBehavior.Strict);
+            secretsManager.SetupSequence(i => i.GetSecretValueAsync(It.Is<GetSecretValueRequest>(j => j.SecretId == binaryResponse1.Name), default(CancellationToken)))
+                .ReturnsAsync(binaryResponse1)
+                .ThrowsAsync(new AmazonSecretsManagerException("This should not be called"));
+            secretsManager.SetupSequence(i => i.DescribeSecretAsync(It.Is<DescribeSecretRequest>(j => j.SecretId == binaryResponse1.Name), default(CancellationToken)))
+                .ReturnsAsync(describeSecretResponse1)
+                .ThrowsAsync(new AmazonSecretsManagerException("This should not be called"));
+
+            SecretsManagerCache cache = new SecretsManagerCache(secretsManager.Object);
+
+            byte[] first = await cache.GetSecretBinary(binaryResponse1.Name, binaryResponse1.VersionId);
+            Assert.Equal(first, binaryResponse1.SecretBinary.ToArray());
+        }
+
+        [Fact]
+        public async Task GetSecretBinaryVersionStageTest()
+        {
+            Mock<IAmazonSecretsManager> secretsManager = new Mock<IAmazonSecretsManager>(MockBehavior.Strict);
+            secretsManager.SetupSequence(i => i.GetSecretValueAsync(It.Is<GetSecretValueRequest>(j => j.SecretId == binaryResponse3.Name), default(CancellationToken)))
+                .ReturnsAsync(binaryResponse3)
+                .ThrowsAsync(new AmazonSecretsManagerException("This should not be called"));
+            secretsManager.SetupSequence(i => i.DescribeSecretAsync(It.Is<DescribeSecretRequest>(j => j.SecretId == binaryResponse3.Name), default(CancellationToken)))
+                .ReturnsAsync(describeSecretResponse1)
+                .ThrowsAsync(new AmazonSecretsManagerException("This should not be called"));
+
+            SecretsManagerCache cache = new SecretsManagerCache(secretsManager.Object);
+
+            byte[] first = await cache.GetSecretBinary(binaryResponse3.Name, "", "AWSPREVIOUS");
+            Assert.Equal(first, binaryResponse3.SecretBinary.ToArray());
         }
 
         [Fact]
@@ -174,14 +256,14 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
                 .ThrowsAsync(new AmazonSecretsManagerException("This should not be called"));
 
             SecretsManagerCache cache = new SecretsManagerCache(secretsManager.Object);
-            
+
             byte[] first = null;
             for (int i = 0; i < 10; i++)
             {
                 first = await cache.GetSecretBinary(binaryResponse1.Name);
             }
             Assert.Equal(first, binaryResponse1.SecretBinary.ToArray());
-            
+
         }
 
         [Fact]
@@ -196,11 +278,11 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
                 .ThrowsAsync(new AmazonSecretsManagerException("This should not be called"));
 
             SecretsManagerCache cache = new SecretsManagerCache(secretsManager.Object);
-            
+
             String first = await cache.GetSecretString(secretStringResponse1.Name);
             String second = await cache.GetSecretString(secretStringResponse1.Name);
             Assert.Equal(first, second);
-            
+
         }
 
         [Fact]
@@ -280,7 +362,7 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
                 .ThrowsAsync(new AmazonSecretsManagerException("This should not be called"));
 
             SecretsManagerCache cache = new SecretsManagerCache(secretsManager.Object, new SecretCacheConfiguration { CacheItemTTL = 1000 });
-            
+
             String first = await cache.GetSecretString(secretStringResponse1.Name);
             String second = await cache.GetSecretString(secretStringResponse1.Name);
             Assert.Equal(first, second);
@@ -434,7 +516,7 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
                 .ReturnsAsync(describeSecretResponse1)
                 .ReturnsAsync(describeSecretResponse1)
                 .ThrowsAsync(new AmazonSecretsManagerException("This should not be called"));
-            
+
             TestHook testHook = new TestHook();
             SecretsManagerCache cache = new SecretsManagerCache(secretsManager.Object, new SecretCacheConfiguration { CacheHook = testHook });
 

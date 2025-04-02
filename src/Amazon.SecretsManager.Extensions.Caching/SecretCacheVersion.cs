@@ -56,7 +56,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
             return await this.client.GetSecretValueAsync(new GetSecretValueRequest { SecretId = this.secretId, VersionId = this.versionId }, cancellationToken);
         }
 
-        protected override Task<GetSecretValueResponse> GetSecretValueAsync(GetSecretValueResponse result, CancellationToken cancellationToken = default)
+        protected override Task<GetSecretValueResponse> GetSecretValueAsync(GetSecretValueResponse result, string versionId = "", string versionStage = "", CancellationToken cancellationToken = default)
         {
             return Task.FromResult(result);
         }
