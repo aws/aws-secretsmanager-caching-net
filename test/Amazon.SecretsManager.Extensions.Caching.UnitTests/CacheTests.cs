@@ -140,8 +140,8 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
                 .ThrowsAsync(new AmazonSecretsManagerException("This should not be called"));
 
             SecretsManagerCache cache = new SecretsManagerCache(secretsManager.Object);
-            string first = await cache.GetSecretString(secretStringResponse3.Name, secretStringResponse3.VersionId);
-            Assert.Equal(first, secretStringResponse3.SecretString);
+            string first = await cache.GetSecretString(secretStringResponse1.Name, secretStringResponse1.VersionId);
+            Assert.Equal(first, secretStringResponse1.SecretString);
         }
 
         [Fact]
