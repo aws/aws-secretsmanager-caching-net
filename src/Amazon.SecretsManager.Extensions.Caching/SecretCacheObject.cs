@@ -96,7 +96,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
 
         protected abstract Task<T> ExecuteRefreshAsync(CancellationToken cancellationToken = default);
 
-        protected abstract Task<GetSecretValueResponse> GetSecretValueAsync(T result, string versionId = "", string versionStage = "", CancellationToken cancellationToken = default);
+        protected abstract Task<GetSecretValueResponse> GetSecretValueAsync(T result, string versionId = null, string versionStage = null, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Return the typed result object.
@@ -209,7 +209,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
         /// If the secret is due for a refresh, the refresh will occur before the result is returned.
         /// If the refresh fails, the cached result is returned, or the cached exception is thrown.
         /// </summary>
-        public async Task<GetSecretValueResponse> GetSecretValue(CancellationToken cancellationToken, string versionId = "", string versionStage = "")
+        public async Task<GetSecretValueResponse> GetSecretValue(CancellationToken cancellationToken, string versionId = null, string versionStage = null)
         {
             bool success = false;
             await Lock.WaitAsync(cancellationToken);

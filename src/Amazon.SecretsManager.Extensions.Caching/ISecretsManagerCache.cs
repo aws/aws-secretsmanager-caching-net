@@ -39,7 +39,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
         /// <param name="versionStage">The version stage.</param>
         /// <param name="cancellationToken">The cancellation token used for the Secrets Manager API call.</param>
         /// <returns>The <c>SecretBinary</c>.</returns>
-        Task<byte[]> GetSecretBinary(string secretId, string versionId = "", string versionStage = "", CancellationToken cancellationToken = default);
+        Task<byte[]> GetSecretBinary(string secretId, string versionId = null, string versionStage = null, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Asynchronously retrieves the specified <c>SecretString</c> after calling <see cref="GetCachedSecret"/>.
@@ -50,7 +50,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
         /// <param name="versionStage">The version stage.</param>
         /// <param name="cancellationToken">The cancellation token used for the Secrets Manager API call.</param>
         /// <returns>The <c>SecretString</c>.</returns>
-        Task<string> GetSecretString(string secretId, string versionId = "", string versionStage = "", CancellationToken cancellationToken = default);
+        Task<string> GetSecretString(string secretId, string versionId = null, string versionStage = null, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Requests the secret value from SecretsManager asynchronously and updates the cache entry with any changes.

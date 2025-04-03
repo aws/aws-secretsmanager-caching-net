@@ -46,7 +46,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
         /// <summary>
         /// Asynchronously retrieves the GetSecretValueResponse from the proper SecretCacheVersion.
         /// </summary>
-        protected override async Task<GetSecretValueResponse> GetSecretValueAsync(DescribeSecretResponse result, string versionId = "", string versionStage = "", CancellationToken cancellationToken = default)
+        protected override async Task<GetSecretValueResponse> GetSecretValueAsync(DescribeSecretResponse result, string versionId = null, string versionStage = null, CancellationToken cancellationToken = default)
         {
             SecretCacheVersion version = GetVersion(result, versionId, versionStage);
             if (version == null)
@@ -75,19 +75,19 @@ namespace Amazon.SecretsManager.Extensions.Caching
         /// Retrieves the SecretCacheVersion corresponding to the Version Stage
         /// specified by the SecretCacheConfiguration.
         /// </summary>
-        private SecretCacheVersion GetVersion(DescribeSecretResponse describeResult, string versionId = "", string versionStage = "")
+        private SecretCacheVersion GetVersion(DescribeSecretResponse describeResult, string versionId = null, string versionStage = null)
         {
             if (null == describeResult?.VersionIdsToStages) return null;
             String currentVersionId = null;
             foreach (KeyValuePair<String, List<String>> entry in describeResult.VersionIdsToStages)
             {
-                if (versionId != string.Empty && entry.Key.Equals(versionId))
+                if (versionId != null && entry.Key.Equals(versionId))
                 {
                     currentVersionId = versionId;
                     break;
                 }
 
-                if ((versionStage != string.Empty && entry.Value.Contains(versionStage)) || entry.Value.Contains(config.VersionStage))
+                if ((versionStage != null && entry.Value.Contains(versionStage)) || entry.Value.Contains(config.VersionStage))
                 {
                     currentVersionId = entry.Key;
                     break;
