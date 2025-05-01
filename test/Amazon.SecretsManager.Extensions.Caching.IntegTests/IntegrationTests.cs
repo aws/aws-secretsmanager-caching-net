@@ -39,8 +39,8 @@
                 foreach (SecretListEntry secret in secretList)
                 {
                     if (secret.Name.StartsWith(TestSecretPrefix)
-                        && DateTime.Compare(secret.LastChangedDate.GetValueOrDefault(), twoDaysAgo) < 0
-                        && DateTime.Compare(secret.LastAccessedDate.GetValueOrDefault(), twoDaysAgo) < 0)
+                        && DateTime.Compare(secret.LastChangedDate ?? throw new InvalidOperationException("Nullable value is null."), twoDaysAgo) < 0
+                        && DateTime.Compare(secret.LastAccessedDate ?? throw new InvalidOperationException("Nullable value is null."), twoDaysAgo) < 0)
                     {
                         SecretNamesToDelete.Add(secret.Name);
                     }
