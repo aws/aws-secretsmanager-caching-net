@@ -36,6 +36,10 @@ To send us a pull request, please:
 5. Send us a pull request, answering any default questions in the pull request interface.
 6. Pay attention to any automated CI failures reported in the pull request, and stay involved in the conversation.
 
+Please enable the removal of trailing whitespaces in your IDE. In JetBrains IDEs, enable the following settings under `Settings -> Editor -> General`:
+
+![JetBrains settings](https://private-user-images.githubusercontent.com/66992519/430139096-944e54df-a5a3-4655-bf10-93265149ec0b.png?jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NDQ3NDg3MjksIm5iZiI6MTc0NDc0ODQyOSwicGF0aCI6Ii82Njk5MjUxOS80MzAxMzkwOTYtOTQ0ZTU0ZGYtYTVhMy00NjU1LWJmMTAtOTMyNjUxNDllYzBiLnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNTA0MTUlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjUwNDE1VDIwMjAyOVomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPWEwNzdkNGFkMDljOWUyZmQwN2E2YmMyNzhlYTI3YmQxODQ4ZGY4YzRmMDExM2E4NzFlN2RiYjYzZTNjMTc2ZDQmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.SPKnCA3FbZUQAcbedzcos2VJdjL95NuSIUFKrfyH5MY)
+
 GitHub provides additional document on [forking a repository](https://help.github.com/articles/fork-a-repo/) and
 [creating a pull request](https://help.github.com/articles/creating-a-pull-request/).
 
