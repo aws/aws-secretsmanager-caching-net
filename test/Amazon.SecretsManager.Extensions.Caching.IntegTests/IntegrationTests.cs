@@ -1,13 +1,13 @@
 ﻿namespace Amazon.SecretsManager.Extensions.Caching.IntegTests
 {
-    using Xunit;
-    using Amazon.SecretsManager.Model;
     using System;
-    using System.Threading;
-    using System.Threading.Tasks;
     using System.Collections.Generic;
     using System.IO;
     using System.Linq;
+    using System.Threading;
+    using System.Threading.Tasks;
+    using Amazon.SecretsManager.Model;
+    using Xunit;
 
     // Performs test secret cleanup before and after integ tests are run
     public class TestBase : IAsyncLifetime
@@ -38,9 +38,11 @@
                 List<SecretListEntry> secretList = response.SecretList;
                 foreach (SecretListEntry secret in secretList)
                 {
-                    if (secret.Name.StartsWith(TestSecretPrefix)
+                    if (
+                        secret.Name.StartsWith(TestSecretPrefix)
                         && DateTime.Compare(secret.LastChangedDate ?? throw new InvalidOperationException("Value for LastChangedDate is null."), twoDaysAgo) < 0
-                        && DateTime.Compare(secret.LastAccessedDate ?? throw new InvalidOperationException("Value for LastAccessedDate is null."), twoDaysAgo) < 0)
+                        && DateTime.Compare(secret.LastAccessedDate ?? throw new InvalidOperationException("Value for LastAccessedDate is null."), twoDaysAgo) < 0
+                    )
                     {
                         SecretNamesToDelete.Add(secret.Name);
                     }
@@ -64,7 +66,11 @@
         private String testSecretString = System.Guid.NewGuid().ToString();
         private MemoryStream testSecretBinary = new MemoryStream(Enumerable.Repeat((byte)0x20, 10).ToArray());
 
-        private enum TestType { SecretString = 0, SecretBinary = 1 };
+        private enum TestType
+        {
+            SecretString = 0,
+            SecretBinary = 1,
+        };
 
         private async Task<string> Setup(TestType type)
         {
@@ -159,6 +165,7 @@
         class TestHook : ISecretCacheHook
         {
             private Dictionary<int, object> dictionary = new Dictionary<int, object>();
+
             public object Get(object cachedObject)
             {
                 return dictionary[(int)cachedObject];
@@ -178,4 +185,3 @@
         }
     }
 }
-

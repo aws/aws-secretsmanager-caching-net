@@ -13,7 +13,6 @@
 
 namespace Amazon.SecretsManager.Extensions.Caching
 {
-
     using System;
     using System.Threading;
     using System.Threading.Tasks;
@@ -23,7 +22,6 @@ namespace Amazon.SecretsManager.Extensions.Caching
     /// </summary>
     public interface ISecretsManagerCache : IDisposable
     {
-
         /// <summary>
         /// Returns the cache entry corresponding to the specified secret if it exists in the cache.
         /// Otherwise, the secret value is fetched from Secrets Manager and a new cache entry is created.
