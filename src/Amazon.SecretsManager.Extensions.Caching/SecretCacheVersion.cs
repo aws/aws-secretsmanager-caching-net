@@ -13,10 +13,10 @@
 
 namespace Amazon.SecretsManager.Extensions.Caching
 {
-    using Amazon.SecretsManager.Model;
     using System;
     using System.Threading;
     using System.Threading.Tasks;
+    using Amazon.SecretsManager.Model;
 
     class SecretCacheVersion : SecretCacheObject<GetSecretValueResponse>
     {
@@ -32,9 +32,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
 
         public override bool Equals(object obj)
         {
-            return obj is SecretCacheVersion scv
-                && this.secretId == scv.secretId
-                && this.versionId == scv.versionId;
+            return obj is SecretCacheVersion scv && this.secretId == scv.secretId && this.versionId == scv.versionId;
         }
 
         public override int GetHashCode()

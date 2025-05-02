@@ -8,6 +8,6 @@ phases:
       - dotnet test -c Release --no-build
       - dotnet pack -c Release --no-build
 artifacts:
-  base-directory: 'src/Amazon.SecretsManager.Extensions.Caching/bin'
+  base-directory: "src/Amazon.SecretsManager.Extensions.Caching/bin"
   files:
-    - 'Release/AWSSDK.SecretsManager.Caching.*.nupkg'
+    - "Release/AWSSDK.SecretsManager.Caching.*.nupkg"

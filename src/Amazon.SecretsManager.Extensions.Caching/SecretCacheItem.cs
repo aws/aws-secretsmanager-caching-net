@@ -25,15 +25,13 @@ namespace Amazon.SecretsManager.Extensions.Caching
     /// </summary>
     public class SecretCacheItem : SecretCacheObject<DescribeSecretResponse>
     {
-        /// The cached secret value versions for this cached secret. 
+        /// The cached secret value versions for this cached secret.
         private readonly MemoryCache versions = new MemoryCache(new MemoryCacheOptions());
         private const ushort MAX_VERSIONS_CACHE_SIZE = 10;
-        
+
         public SecretCacheItem(String secretId, IAmazonSecretsManager client, SecretCacheConfiguration config)
-            : base(secretId, client, config)
-        {
-        }
-        
+            : base(secretId, client, config) { }
+
         /// <summary>
         /// Asynchronously retrieves the most current DescribeSecretResponse from Secrets Manager
         /// as part of the Refresh operation.
@@ -77,7 +75,8 @@ namespace Amazon.SecretsManager.Extensions.Caching
         /// </summary>
         private SecretCacheVersion GetVersion(DescribeSecretResponse describeResult)
         {
-            if (null == describeResult?.VersionIdsToStages) return null;
+            if (null == describeResult?.VersionIdsToStages)
+                return null;
             String currentVersionId = null;
             foreach (KeyValuePair<String, List<String>> entry in describeResult.VersionIdsToStages)
             {

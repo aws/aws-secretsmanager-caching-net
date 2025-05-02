@@ -28,31 +28,25 @@ namespace Amazon.SecretsManager.Extensions.Caching
         private readonly IAmazonSecretsManager secretsManager;
         private readonly SecretCacheConfiguration config;
         private readonly MemoryCacheEntryOptions cacheItemPolicy;
-        private readonly MemoryCache cache = new MemoryCache(new MemoryCacheOptions{ CompactionPercentage = 0 });
+        private readonly MemoryCache cache = new MemoryCache(new MemoryCacheOptions { CompactionPercentage = 0 });
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SecretsManagerCache"/> class.
         /// </summary>
         public SecretsManagerCache()
-            : this(new AmazonSecretsManagerClient(), new SecretCacheConfiguration())
-        {
-        }
+            : this(new AmazonSecretsManagerClient(), new SecretCacheConfiguration()) { }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SecretsManagerCache"/> class.
         /// </summary>
         public SecretsManagerCache(IAmazonSecretsManager secretsManager)
-            : this(secretsManager, new SecretCacheConfiguration())
-        {
-        }
+            : this(secretsManager, new SecretCacheConfiguration()) { }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SecretsManagerCache"/> class.
         /// </summary>
         public SecretsManagerCache(SecretCacheConfiguration config)
-            : this(new AmazonSecretsManagerClient(), config)
-        {
-        }
+            : this(new AmazonSecretsManagerClient(), config) { }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SecretsManagerCache"/> class.
@@ -61,10 +55,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
         {
             this.config = config;
             this.secretsManager = secretsManager;
-            cacheItemPolicy = new MemoryCacheEntryOptions()
-            {
-                AbsoluteExpirationRelativeToNow = TimeSpan.FromMilliseconds(this.config.CacheItemTTL)
-            };
+            cacheItemPolicy = new MemoryCacheEntryOptions() { AbsoluteExpirationRelativeToNow = TimeSpan.FromMilliseconds(this.config.CacheItemTTL) };
             if (this.secretsManager is AmazonSecretsManagerClient sm)
             {
                 sm.BeforeRequestEvent += this.ServiceClientBeforeRequestEvent;
@@ -73,7 +64,11 @@ namespace Amazon.SecretsManager.Extensions.Caching
 
         private void ServiceClientBeforeRequestEvent(object sender, RequestEventArgs e)
         {
-            if (e is WebServiceRequestEventArgs args && args.Headers.ContainsKey(VersionInfo.USER_AGENT_HEADER) && !args.Headers[VersionInfo.USER_AGENT_HEADER].Contains(VersionInfo.USER_AGENT_STRING))
+            if (
+                e is WebServiceRequestEventArgs args
+                && args.Headers.ContainsKey(VersionInfo.USER_AGENT_HEADER)
+                && !args.Headers[VersionInfo.USER_AGENT_HEADER].Contains(VersionInfo.USER_AGENT_STRING)
+            )
                 args.Headers[VersionInfo.USER_AGENT_HEADER] = String.Format("{0}/{1}", args.Headers[VersionInfo.USER_AGENT_HEADER], VersionInfo.USER_AGENT_STRING);
         }
 
