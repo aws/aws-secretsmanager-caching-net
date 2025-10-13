@@ -18,12 +18,12 @@ namespace Amazon.SecretsManager.Extensions.Caching
         /// <summary>
         /// Incremented for design changes that break backward compatibility.
         /// </summary>
-        public const string VERSION_NUM = "1";
+        public const string VERSION_NUM = "2";
 
         /// <summary>
         /// Incremented for major changes to the implementation
         /// </summary>
-        public const string MAJOR_REVISION_NUM = "1";
+        public const string MAJOR_REVISION_NUM = "0";
 
         /// <summary>
         /// Incremented for minor changes to the implementation
