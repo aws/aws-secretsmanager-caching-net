@@ -12,20 +12,27 @@ permissions:
 
 jobs:
   build:
-    runs-on: windows-latest
+    name: build (${{ matrix.runner}}, .NET ${{ matrix.dotnet-version }})
+    strategy:
+      fail-fast: false
+      matrix:
+        # Run on supported LTS versions
+        runner: [ubuntu-latest, windows-latest]
+        dotnet-version: [10, 8]
+    runs-on: ${{ matrix.runner }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: |
-            8
+          dotnet-version: ${{ matrix.dotnet-version }}
       - name: Install .NET Framework (add MSBuild to Path)
-        uses: microsoft/setup-msbuild@v2
+        if: runner.os == 'Windows'
+        uses: microsoft/setup-msbuild@v3
         with:
-          msbuild-architecture: x64
+          msbuild-architecture: ${{ runner.arch }}
       - name: Restore dependencies
         run: dotnet restore
       - name: Build
@@ -33,9 +40,9 @@ jobs:
       - name: Test
         # Strong name requires disabling xUnit app domains in order to get coverage using coverlet
         # https://github.com/MarcoRossignoli/coverlet/blob/master/Documentation/KnownIssues.md#tests-fail-if-assembly-is-strong-named
-        run: dotnet test --no-build --verbosity normal --collect:"XPlat Code Coverage" test/Amazon.SecretsManager.Extensions.Caching.UnitTests -- RunConfiguration.DisableAppDomain=true
+        run: dotnet test --no-build --verbosity normal --collect:"XPlat Code Coverage" test/Amazon.SecretsManager.Extensions.Caching.UnitTests ${{ runner.os != 'Windows' && format('--framework net{0}.0', matrix.dotnet-version) || '' }} -- RunConfiguration.DisableAppDomain=true
       - name: Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           directory: test/Amazon.SecretsManager.Extensions.Caching.UnitTests/TestResults
           fail_ci_if_error: true
