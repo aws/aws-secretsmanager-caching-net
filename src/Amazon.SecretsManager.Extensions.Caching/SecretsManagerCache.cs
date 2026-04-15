@@ -92,7 +92,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
         {
             SecretCacheItem secret = GetCachedSecret(secretId);
             GetSecretValueResponse response = null;
-            response = await secret.GetSecretValue(cancellationToken);
+            response = await secret.GetSecretValue(cancellationToken).ConfigureAwait(false);
             return response?.SecretString;
         }
 
@@ -103,7 +103,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
         {
             SecretCacheItem secret = GetCachedSecret(secretId);
             GetSecretValueResponse response = null;
-            response = await secret.GetSecretValue(cancellationToken);
+            response = await secret.GetSecretValue(cancellationToken).ConfigureAwait(false);
             return response?.SecretBinary?.ToArray();
         }
 
@@ -114,7 +114,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
         /// </summary>
         public async Task<bool> RefreshNowAsync(String secretId, CancellationToken cancellationToken = default)
         {
-            return await GetCachedSecret(secretId).RefreshNowAsync(cancellationToken);
+            return await GetCachedSecret(secretId).RefreshNowAsync(cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>

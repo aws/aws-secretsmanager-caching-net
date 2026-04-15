@@ -151,7 +151,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
             refreshNeeded = false;
             try
             {
-                SetResult(await ExecuteRefreshAsync(cancellationToken));
+                SetResult(await ExecuteRefreshAsync(cancellationToken).ConfigureAwait(false));
                 exception = null;
                 exceptionCount = 0;
                 return true;
@@ -192,10 +192,10 @@ namespace Amazon.SecretsManager.Extensions.Caching
 
             // Perform the requested refresh.
             bool success = false;
-            await Lock.WaitAsync(cancellationToken);
+            await Lock.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                success = await RefreshAsync(cancellationToken);
+                success = await RefreshAsync(cancellationToken).ConfigureAwait(false);
             }
             finally
             {
@@ -212,10 +212,10 @@ namespace Amazon.SecretsManager.Extensions.Caching
         public async Task<GetSecretValueResponse> GetSecretValue(CancellationToken cancellationToken)
         {
             bool success = false;
-            await Lock.WaitAsync(cancellationToken);
+            await Lock.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                success = await RefreshAsync(cancellationToken);
+                success = await RefreshAsync(cancellationToken).ConfigureAwait(false);
             }
             finally
             {
@@ -226,7 +226,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
             {
                 System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(exception).Throw();
             }
-            return await GetSecretValueAsync(GetResult(), cancellationToken);
+            return await GetSecretValueAsync(GetResult(), cancellationToken).ConfigureAwait(false);
         }
     }
 }

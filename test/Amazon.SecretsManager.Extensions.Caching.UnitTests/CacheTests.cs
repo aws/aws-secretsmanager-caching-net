@@ -450,5 +450,132 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
             }
             Assert.Equal(4, testHook.GetCount());
         }
+
+        class SingleThreadSynchronizationContext : SynchronizationContext, IDisposable
+        {
+            object _lock;
+            Queue<(SendOrPostCallback, object)> _workQueue;
+            Thread _thread;
+
+            public SingleThreadSynchronizationContext()
+            {
+                _lock = new object();
+                _workQueue = new Queue<(SendOrPostCallback, object)>();
+                _thread = new Thread(ThreadLoop);
+                _thread.Start();
+            }
+
+            public override void Post(SendOrPostCallback d, object state)
+            {
+                lock (_lock)
+                {
+                    _workQueue.Enqueue((d, state));
+                    Monitor.Pulse(_lock);
+                }
+            }
+
+            public override void Send(SendOrPostCallback d, object state)
+            {
+                ManualResetEvent re = new ManualResetEvent(false);
+                Post((_) =>
+                {
+                    try
+                    {
+                        d(state);
+                    }
+                    finally
+                    {
+                        re.Set();
+                    }
+                }, null);
+                re.WaitOne();
+            }
+
+            void ThreadLoop()
+            {
+                for (;;)
+                {
+                    (SendOrPostCallback, object) item;
+
+                    lock (_lock)
+                    {
+                        for (;;)
+                        {
+                            if (_workQueue == null)
+                                return;
+                            if (_workQueue.Count > 0)
+                            {
+                                item = _workQueue.Dequeue();
+                                break;
+                            }
+                            Monitor.Wait(_lock);
+                        }
+                    }
+
+                    item.Item1.Invoke(item.Item2);
+                }
+            }
+
+            public void Dispose()
+            {
+                lock (_lock)
+                {
+                    _workQueue = null;
+                    Monitor.Pulse(_lock);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Test the returned Tasks can be Wait()'ed, regardless on which sychronization
+        /// context the call was made from.
+        /// </summary>
+        [Fact]
+        public async Task DontCaptureContextTest()
+        {
+            // single threaded sync context, simulating UI thread
+            SingleThreadSynchronizationContext syncContext = new SingleThreadSynchronizationContext();
+            SynchronizationContext.SetSynchronizationContext(syncContext);
+
+            try
+            {
+                await Task.Factory.StartNew(
+                    () =>
+                    {
+                        Mock<IAmazonSecretsManager> secretsManager = new Mock<IAmazonSecretsManager>(MockBehavior.Strict);
+                        secretsManager.SetupSequence(i => i.GetSecretValueAsync(It.Is<GetSecretValueRequest>(j => j.SecretId == secretStringResponse1.Name), default(CancellationToken)))
+                            .Returns(async () =>
+                            {
+                                // Ensure Task returned is not RunToCompletion to get the async callback
+                                await Task.Delay(1).ConfigureAwait(false);
+                                return secretStringResponse1;
+                            })
+                            .ThrowsAsync(new AmazonSecretsManagerException("This should not be called"));
+                        secretsManager.SetupSequence(i => i.DescribeSecretAsync(It.Is<DescribeSecretRequest>(j => j.SecretId == secretStringResponse1.Name), default(CancellationToken)))
+                            .Returns(async () =>
+                            {
+                                // Ensure Task returned is not RunToCompletion to get the async callback
+                                await Task.Delay(1).ConfigureAwait(false);
+                                return describeSecretResponse1;
+                            })
+                            .ThrowsAsync(new AmazonSecretsManagerException("This should not be called"));
+
+                        SecretsManagerCache cache = new SecretsManagerCache(secretsManager.Object);
+                        Task<string> getSecretTask = cache.GetSecretString(secretStringResponse1.Name);
+                        if (!getSecretTask.Wait(TimeSpan.FromSeconds(2)))
+                            Assert.Fail("GetSecretString did not complete within the timeout. (It captured the current synchronization context).");
+
+                        Assert.Equal(getSecretTask.Result, secretStringResponse1.SecretString);
+                    },
+                    CancellationToken.None,
+                    TaskCreationOptions.None,
+                    TaskScheduler.FromCurrentSynchronizationContext());
+            }
+            finally
+            {
+                syncContext.Dispose();
+                SynchronizationContext.SetSynchronizationContext(null);
+            }
+        }
     }
 }
