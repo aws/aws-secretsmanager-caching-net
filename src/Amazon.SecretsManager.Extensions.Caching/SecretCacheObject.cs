@@ -162,7 +162,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
                 // Determine the amount of growth in exception backoff time based on the growth
                 // factor and default backoff duration.
 
-                nextRetryTime = Environment.TickCount + EXCEPTION_JITTERED_DELAY.GetRetryDelay((int)exceptionCount).Milliseconds;
+                nextRetryTime = Environment.TickCount + (long)EXCEPTION_JITTERED_DELAY.GetRetryDelay((int)exceptionCount).TotalMilliseconds;
             }
             return false;
         }
@@ -177,7 +177,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
             // When forcing a refresh, always sleep with a random jitter
             // to prevent coding errors that could be calling refreshNow
             // in a loop.
-            long sleep = FORCE_REFRESH_JITTERED_DELAY.GetRetryDelay(1).Milliseconds;
+            long sleep = (long)FORCE_REFRESH_JITTERED_DELAY.GetRetryDelay(1).TotalMilliseconds;
 
             // Make sure we are not waiting for the next refresh after an
             // exception.  If we are, sleep based on the retry delay of
@@ -188,7 +188,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
                 long wait = nextRetryTime - Environment.TickCount;
                 sleep = Math.Max(wait, sleep);
             }
-            Thread.Sleep((int)sleep);
+            await Task.Delay((int)sleep, cancellationToken);
 
             // Perform the requested refresh.
             bool success = false;

@@ -401,6 +401,42 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
             }
         }
 
+        [Fact]
+        public async Task RefreshNowAsyncRespectsTokenCancellation()
+        {
+            Mock<IAmazonSecretsManager> secretsManager = new Mock<IAmazonSecretsManager>(MockBehavior.Strict);
+            secretsManager.SetupSequence(i => i.GetSecretValueAsync(It.Is<GetSecretValueRequest>(j => j.SecretId == secretStringResponse1.Name), default(CancellationToken)))
+                .ReturnsAsync(secretStringResponse1)
+                .ThrowsAsync(new AmazonSecretsManagerException("This should not be called"));
+            secretsManager.SetupSequence(i => i.DescribeSecretAsync(It.Is<DescribeSecretRequest>(j => j.SecretId == secretStringResponse1.Name), default(CancellationToken)))
+                .ReturnsAsync(describeSecretResponse1)
+                .ThrowsAsync(new AmazonSecretsManagerException("This should not be called"));
+
+            SecretsManagerCache cache = new SecretsManagerCache(secretsManager.Object);
+
+            // First call to populate the cache
+            await cache.GetSecretString(secretStringResponse1.Name);
+
+            // Cancel immediately - RefreshNowAsync should throw OperationCanceledException
+            // promptly during the jitter delay rather than blocking the thread
+            using (var cts = new CancellationTokenSource())
+            {
+                cts.Cancel();
+
+                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                    () => cache.RefreshNowAsync(secretStringResponse1.Name, cts.Token));
+                stopwatch.Stop();
+
+                // With await Task.Delay and a pre-cancelled token, cancellation should be
+                // near-instant (< 100ms). This verifies the delay is non-blocking and
+                // respects the CancellationToken.
+                Assert.True(stopwatch.ElapsedMilliseconds < 100,
+                    $"Expected cancellation within 100ms but took {stopwatch.ElapsedMilliseconds}ms. " +
+                    $"This suggests the delay is blocking rather than using async cancellation.");
+            }
+        }
+
         class TestHook : ISecretCacheHook
         {
             private Dictionary<int, object> dictionary = new Dictionary<int, object>();
