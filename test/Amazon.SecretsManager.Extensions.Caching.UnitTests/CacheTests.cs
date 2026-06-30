@@ -437,6 +437,69 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
             }
         }
 
+        [Fact]
+        public async Task RefreshNowAsyncAfterExceptionWithExpiredBackoff()
+        {
+            // Covers the branch: exception != null, but nextRetryTime is in the past
+            // (wait is negative), so sleep remains the base jitter value.
+            Mock<IAmazonSecretsManager> secretsManager = new Mock<IAmazonSecretsManager>(MockBehavior.Strict);
+            secretsManager.SetupSequence(i => i.DescribeSecretAsync(It.Is<DescribeSecretRequest>(j => j.SecretId == secretStringResponse1.Name), default(CancellationToken)))
+                .ThrowsAsync(new AmazonServiceException("Expected failure"))
+                .ReturnsAsync(describeSecretResponse1);
+            secretsManager.Setup(i => i.GetSecretValueAsync(It.Is<GetSecretValueRequest>(j => j.SecretId == secretStringResponse1.Name), default(CancellationToken)))
+                .ReturnsAsync(secretStringResponse1);
+
+            SecretsManagerCache cache = new SecretsManagerCache(secretsManager.Object);
+
+            // Trigger an exception to set nextRetryTime
+            try { await cache.GetSecretString(secretStringResponse1.Name); }
+            catch (AmazonServiceException) { }
+
+            // Wait for backoff to expire (nextRetryTime will be in the past)
+            Thread.Sleep(1500);
+
+            // RefreshNowAsync enters the exception branch with negative wait.
+            // Should not throw and should recover successfully.
+            bool success = await cache.RefreshNowAsync(secretStringResponse1.Name);
+            Assert.True(success);
+        }
+
+        [Fact]
+        public async Task RefreshNowAsyncAfterExceptionWithActiveBackoff()
+        {
+            // Covers the branch: exception != null, nextRetryTime is in the future,
+            // and wait > sleep, so sleep is set to wait.
+            // We use cancellation to avoid actually waiting the full backoff duration.
+            Mock<IAmazonSecretsManager> secretsManager = new Mock<IAmazonSecretsManager>(MockBehavior.Strict);
+
+            // Throw enough exceptions to push backoff well above the base jitter (~7s).
+            // JitteredDelay with base 1s and exceptionCount=4 gives ~16s backoff.
+            secretsManager.Setup(i => i.DescribeSecretAsync(It.Is<DescribeSecretRequest>(j => j.SecretId == secretStringResponse1.Name), It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new AmazonServiceException("Persistent failure"));
+
+            SecretsManagerCache cache = new SecretsManagerCache(secretsManager.Object);
+
+            // Call GetSecretString multiple times to increment exceptionCount.
+            // Each call after the first won't retry due to backoff, but we wait
+            // between calls to allow backoff to expire and trigger new attempts.
+            for (int i = 0; i < 5; i++)
+            {
+                try { await cache.GetSecretString(secretStringResponse1.Name); }
+                catch (AmazonServiceException) { }
+                Thread.Sleep(1500);
+            }
+
+            // Now nextRetryTime should be far in the future (high exceptionCount).
+            // RefreshNowAsync should enter the branch where wait > sleep.
+            // Use cancellation to exit immediately without waiting the full duration.
+            using (var cts = new CancellationTokenSource())
+            {
+                cts.Cancel();
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                    () => cache.RefreshNowAsync(secretStringResponse1.Name, cts.Token));
+            }
+        }
+
         class TestHook : ISecretCacheHook
         {
             private Dictionary<int, object> dictionary = new Dictionary<int, object>();
