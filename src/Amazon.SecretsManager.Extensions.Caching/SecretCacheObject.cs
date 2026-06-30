@@ -75,7 +75,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
         private long exceptionCount = 0;
         
         /// The time to wait before retrying a failed AWS Secrets Manager request.
-        private long nextRetryTime = 0;
+        private DateTime nextRetryTime = DateTime.MinValue;
 
         public static readonly ThreadLocal<Random> random = new ThreadLocal<Random>(() => new Random(Environment.TickCount));
 
@@ -139,7 +139,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
             //
             // If we have exceeded our backoff time we will refresh
             // the secret now.
-            return Environment.TickCount >= nextRetryTime;
+            return DateTime.UtcNow >= nextRetryTime;
         }
 
         /// <summary>
@@ -162,7 +162,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
                 // Determine the amount of growth in exception backoff time based on the growth
                 // factor and default backoff duration.
 
-                nextRetryTime = Environment.TickCount + (long)EXCEPTION_JITTERED_DELAY.GetRetryDelay((int)exceptionCount).TotalMilliseconds;
+                nextRetryTime = DateTime.UtcNow + EXCEPTION_JITTERED_DELAY.GetRetryDelay((int)exceptionCount);
             }
             return false;
         }
@@ -177,7 +177,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
             // When forcing a refresh, always sleep with a random jitter
             // to prevent coding errors that could be calling refreshNow
             // in a loop.
-            long sleep = (long)FORCE_REFRESH_JITTERED_DELAY.GetRetryDelay(1).TotalMilliseconds;
+            TimeSpan sleep = FORCE_REFRESH_JITTERED_DELAY.GetRetryDelay(1);
 
             // Make sure we are not waiting for the next refresh after an
             // exception.  If we are, sleep based on the retry delay of
@@ -185,10 +185,13 @@ namespace Amazon.SecretsManager.Extensions.Caching
             // secret that continues to throw an exception such as AccessDenied.
             if (null != exception)
             {
-                long wait = nextRetryTime - Environment.TickCount;
-                sleep = Math.Max(wait, sleep);
+                TimeSpan wait = nextRetryTime - DateTime.UtcNow;
+                if (wait > sleep)
+                {
+                    sleep = wait;
+                }
             }
-            await Task.Delay((int)sleep, cancellationToken);
+            await Task.Delay(sleep, cancellationToken);
 
             // Perform the requested refresh.
             bool success = false;
