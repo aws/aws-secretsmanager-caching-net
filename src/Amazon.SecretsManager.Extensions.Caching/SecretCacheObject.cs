@@ -159,6 +159,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
             catch (Exception ex) when (ex is AmazonServiceException || ex is AmazonClientException)
             {
                 exception = ex;
+                exceptionCount++;
                 // Determine the amount of growth in exception backoff time based on the growth
                 // factor and default backoff duration.
 
