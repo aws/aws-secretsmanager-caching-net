@@ -22,7 +22,6 @@ namespace Amazon.SecretsManager.Extensions.Caching
         public const string DEFAULT_VERSION_STAGE = "AWSCURRENT";
         public const uint DEFAULT_CACHE_ITEM_TTL = 3600000;
         public const uint DEFAULT_EXCEPTION_RETRY_DELAY_BASE = 1000;
-        public const uint DEFAULT_EXCEPTION_RETRY_DELAY_GROWTH_FACTOR = 2;
         public const uint DEFAULT_EXCEPTION_RETRY_DELAY_MAX = 128000;
         public const uint DEFAULT_FORCE_REFRESH_DELAY_BASE = 3500;
         public const uint DEFAULT_FORCE_REFRESH_DELAY_JITTER = 1000;
