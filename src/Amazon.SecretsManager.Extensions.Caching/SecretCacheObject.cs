@@ -22,28 +22,8 @@ namespace Amazon.SecretsManager.Extensions.Caching
 
     public abstract class SecretCacheObject<T>
     {
-        /// The number of milliseconds to wait after an exception. 
-        private const long EXCEPTION_BACKOFF = 1000;
-
-        /// The growth factor of the backoff duration. 
-        private const long EXCEPTION_BACKOFF_GROWTH_FACTOR = 2;
-        
-        /// The maximum number of milliseconds to wait before retrying a failed
-        /// request.
-        private const long BACKOFF_PLATEAU = 128 * EXCEPTION_BACKOFF;
-
-        private JitteredDelay EXCEPTION_JITTERED_DELAY = new JitteredDelay(TimeSpan.FromMilliseconds(EXCEPTION_BACKOFF), 
-                                                                    TimeSpan.FromMilliseconds(EXCEPTION_BACKOFF), 
-                                                                    TimeSpan.FromMilliseconds(BACKOFF_PLATEAU));
-        
-        /// When forcing a refresh using the refreshNow method, a random sleep
-        /// will be performed using this value.  This helps prevent code from
-        /// executing a refreshNow in a continuous loop without waiting.
-        private const long FORCE_REFRESH_JITTER_BASE_INCREMENT = 3500;
-        private const long FORCE_REFRESH_JITTER_VARIANCE = 1000;
-
-        private JitteredDelay FORCE_REFRESH_JITTERED_DELAY = new JitteredDelay(TimeSpan.FromMilliseconds(FORCE_REFRESH_JITTER_BASE_INCREMENT),
-                                                                        TimeSpan.FromMilliseconds(FORCE_REFRESH_JITTER_VARIANCE));
+        private readonly JitteredDelay exceptionJitteredDelay;
+        private readonly JitteredDelay forceRefreshJitteredDelay;
 
         /// The secret identifier for this cached object. 
         protected String secretId;
@@ -92,6 +72,13 @@ namespace Amazon.SecretsManager.Extensions.Caching
             this.secretId = secretId;
             this.client = client;
             this.config = config;
+            this.exceptionJitteredDelay = new JitteredDelay(
+                TimeSpan.FromMilliseconds(config.ExceptionRetryDelayBase),
+                TimeSpan.FromMilliseconds(config.ExceptionRetryDelayBase),
+                TimeSpan.FromMilliseconds(config.ExceptionRetryDelayMax));
+            this.forceRefreshJitteredDelay = new JitteredDelay(
+                TimeSpan.FromMilliseconds(config.ForceRefreshDelayBase),
+                TimeSpan.FromMilliseconds(config.ForceRefreshDelayJitter));
         }
      
         protected abstract Task<T> ExecuteRefreshAsync(CancellationToken cancellationToken = default);
@@ -163,7 +150,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
                 // Determine the amount of growth in exception backoff time based on the growth
                 // factor and default backoff duration.
 
-                nextRetryTime = DateTime.UtcNow + EXCEPTION_JITTERED_DELAY.GetRetryDelay((int)exceptionCount);
+                nextRetryTime = DateTime.UtcNow + exceptionJitteredDelay.GetRetryDelay((int)exceptionCount);
             }
             return false;
         }
@@ -178,7 +165,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
             // When forcing a refresh, always sleep with a random jitter
             // to prevent coding errors that could be calling refreshNow
             // in a loop.
-            TimeSpan sleep = FORCE_REFRESH_JITTERED_DELAY.GetRetryDelay(1);
+            TimeSpan sleep = forceRefreshJitteredDelay.GetRetryDelay(1);
 
             // Make sure we are not waiting for the next refresh after an
             // exception.  If we are, sleep based on the retry delay of
@@ -187,6 +174,10 @@ namespace Amazon.SecretsManager.Extensions.Caching
             if (null != exception)
             {
                 TimeSpan wait = nextRetryTime - DateTime.UtcNow;
+                if (wait < TimeSpan.Zero)
+                {
+                    wait = TimeSpan.Zero;
+                }
                 if (wait > sleep)
                 {
                     sleep = wait;

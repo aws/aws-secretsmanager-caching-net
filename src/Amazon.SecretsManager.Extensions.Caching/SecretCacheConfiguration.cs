@@ -21,6 +21,11 @@ namespace Amazon.SecretsManager.Extensions.Caching
         public const ushort DEFAULT_MAX_CACHE_SIZE = 1024;
         public const string DEFAULT_VERSION_STAGE = "AWSCURRENT";
         public const uint DEFAULT_CACHE_ITEM_TTL = 3600000;
+        public const uint DEFAULT_EXCEPTION_RETRY_DELAY_BASE = 1000;
+        public const uint DEFAULT_EXCEPTION_RETRY_DELAY_GROWTH_FACTOR = 2;
+        public const uint DEFAULT_EXCEPTION_RETRY_DELAY_MAX = 128000;
+        public const uint DEFAULT_FORCE_REFRESH_DELAY_BASE = 3500;
+        public const uint DEFAULT_FORCE_REFRESH_DELAY_JITTER = 1000;
 
         /// <summary>
         /// Gets or sets the TTL of a cache item in milliseconds. The default value for this is 3600000 millseconds, or one hour.
@@ -48,5 +53,29 @@ namespace Amazon.SecretsManager.Extensions.Caching
         /// Gets or sets the optional <see cref="ISecretCacheHook"/> implementation.
         /// </summary>
         public ISecretCacheHook CacheHook { get; set; } = null;
+
+        /// <summary>
+        /// Gets or sets the base delay in milliseconds for exponential backoff after a failed request.
+        /// The default value is 1000 milliseconds (1 second).
+        /// </summary>
+        public uint ExceptionRetryDelayBase { get; set; } = DEFAULT_EXCEPTION_RETRY_DELAY_BASE;
+
+        /// <summary>
+        /// Gets or sets the maximum delay in milliseconds for exponential backoff after repeated failures.
+        /// The default value is 128000 milliseconds (128 seconds).
+        /// </summary>
+        public uint ExceptionRetryDelayMax { get; set; } = DEFAULT_EXCEPTION_RETRY_DELAY_MAX;
+
+        /// <summary>
+        /// Gets or sets the base delay in milliseconds for the jitter sleep during a forced refresh.
+        /// The default value is 3500 milliseconds (3.5 seconds).
+        /// </summary>
+        public uint ForceRefreshDelayBase { get; set; } = DEFAULT_FORCE_REFRESH_DELAY_BASE;
+
+        /// <summary>
+        /// Gets or sets the random jitter variance in milliseconds added to the forced refresh delay.
+        /// The default value is 1000 milliseconds (1 second).
+        /// </summary>
+        public uint ForceRefreshDelayJitter { get; set; } = DEFAULT_FORCE_REFRESH_DELAY_JITTER;
     }
 }
