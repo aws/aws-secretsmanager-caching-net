@@ -388,7 +388,8 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
 
             }
 
-            // Wait for backoff interval before retrying to verify a retry is performed.
+            // exceptionCount increments to 1 after the first failure, so the backoff
+            // at count=1 is ~2s + jitter. Wait long enough for it to expire.
             Thread.Sleep(3000);
 
             try
@@ -444,10 +445,10 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
             // (wait is negative), so sleep remains the base jitter value.
             var fastConfig = new SecretCacheConfiguration
             {
-                ExceptionRetryDelayBase = 1,
-                ExceptionRetryDelayMax = 1,
-                ForceRefreshDelayBase = 10,
-                ForceRefreshDelayJitter = 5
+                ExceptionRetryDelayBase = TimeSpan.FromMilliseconds(1),
+                ExceptionRetryDelayMax = TimeSpan.FromMilliseconds(1),
+                ForceRefreshDelayBase = TimeSpan.FromMilliseconds(10),
+                ForceRefreshDelayJitter = TimeSpan.FromMilliseconds(5)
             };
 
             Mock<IAmazonSecretsManager> secretsManager = new Mock<IAmazonSecretsManager>(MockBehavior.Strict);
@@ -480,10 +481,10 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
             // Use fast config so backoff exceeds force-refresh jitter quickly.
             var fastConfig = new SecretCacheConfiguration
             {
-                ExceptionRetryDelayBase = 50,
-                ExceptionRetryDelayMax = 5000,
-                ForceRefreshDelayBase = 10,
-                ForceRefreshDelayJitter = 5
+                ExceptionRetryDelayBase = TimeSpan.FromMilliseconds(50),
+                ExceptionRetryDelayMax = TimeSpan.FromSeconds(5),
+                ForceRefreshDelayBase = TimeSpan.FromMilliseconds(10),
+                ForceRefreshDelayJitter = TimeSpan.FromMilliseconds(5)
             };
 
             Mock<IAmazonSecretsManager> secretsManager = new Mock<IAmazonSecretsManager>(MockBehavior.Strict);
@@ -518,16 +519,16 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
         }
 
         [Fact]
-        public async Task RefreshNowAsyncClampsNegativeWaitToZero()
+        public async Task RefreshNowAsyncWithNegativeWaitSucceeds()
         {
-            // Verifies that a negative wait (nextRetryTime in the past / clock rollback)
-            // is clamped to zero and does not cause Task.Delay to throw.
+            // When nextRetryTime is in the past, wait is negative and does not
+            // replace sleep (which is always positive), so Task.Delay is safe.
             var fastConfig = new SecretCacheConfiguration
             {
-                ExceptionRetryDelayBase = 1,
-                ExceptionRetryDelayMax = 1,
-                ForceRefreshDelayBase = 10,
-                ForceRefreshDelayJitter = 5
+                ExceptionRetryDelayBase = TimeSpan.FromMilliseconds(1),
+                ExceptionRetryDelayMax = TimeSpan.FromMilliseconds(1),
+                ForceRefreshDelayBase = TimeSpan.FromMilliseconds(10),
+                ForceRefreshDelayJitter = TimeSpan.FromMilliseconds(5)
             };
 
             Mock<IAmazonSecretsManager> secretsManager = new Mock<IAmazonSecretsManager>(MockBehavior.Strict);
@@ -546,7 +547,7 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
             // Wait long enough for nextRetryTime to be in the past (wait becomes negative)
             Thread.Sleep(50);
 
-            // Should not throw ArgumentOutOfRangeException from Task.Delay
+            // Negative wait is less than sleep, so sleep stays positive — no exception
             bool success = await cache.RefreshNowAsync(secretStringResponse1.Name);
             Assert.True(success);
         }

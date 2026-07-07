@@ -45,6 +45,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
         /// If there is no existing cache entry, a new one is created.
         /// Returns true or false depending on if the refresh is successful.
         /// </summary>
+        /// <exception cref="System.OperationCanceledException">Thrown when the <paramref name="cancellationToken"/> is cancelled during the backoff delay.</exception>
         Task<bool> RefreshNowAsync(string secretId, CancellationToken cancellationToken = default);
     }
 }

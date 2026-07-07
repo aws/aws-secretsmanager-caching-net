@@ -73,12 +73,12 @@ namespace Amazon.SecretsManager.Extensions.Caching
             this.client = client;
             this.config = config;
             this.exceptionJitteredDelay = new JitteredDelay(
-                TimeSpan.FromMilliseconds(config.ExceptionRetryDelayBase),
-                TimeSpan.FromMilliseconds(config.ExceptionRetryDelayBase),
-                TimeSpan.FromMilliseconds(config.ExceptionRetryDelayMax));
+                config.ExceptionRetryDelayBase,
+                config.ExceptionRetryDelayBase,
+                config.ExceptionRetryDelayMax);
             this.forceRefreshJitteredDelay = new JitteredDelay(
-                TimeSpan.FromMilliseconds(config.ForceRefreshDelayBase),
-                TimeSpan.FromMilliseconds(config.ForceRefreshDelayJitter));
+                config.ForceRefreshDelayBase,
+                config.ForceRefreshDelayJitter);
         }
      
         protected abstract Task<T> ExecuteRefreshAsync(CancellationToken cancellationToken = default);
@@ -159,6 +159,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
         /// Method to force the refresh of a cached secret state.
         /// Returns true if the refresh completed without error.
         /// </summary>
+        /// <exception cref="System.OperationCanceledException">Thrown when the <paramref name="cancellationToken"/> is cancelled during the backoff delay.</exception>
         public async Task<bool> RefreshNowAsync(CancellationToken cancellationToken = default)
         {
             refreshNeeded = true;
@@ -174,10 +175,6 @@ namespace Amazon.SecretsManager.Extensions.Caching
             if (null != exception)
             {
                 TimeSpan wait = nextRetryTime - DateTime.UtcNow;
-                if (wait < TimeSpan.Zero)
-                {
-                    wait = TimeSpan.Zero;
-                }
                 if (wait > sleep)
                 {
                     sleep = wait;
