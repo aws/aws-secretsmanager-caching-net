@@ -13,6 +13,8 @@
 
 namespace Amazon.SecretsManager.Extensions.Caching
 {
+    using System;
+
     /// <summary>
     /// A class used for configuring AWS Secrets Manager client-side caching.
     /// </summary>
@@ -21,6 +23,10 @@ namespace Amazon.SecretsManager.Extensions.Caching
         public const ushort DEFAULT_MAX_CACHE_SIZE = 1024;
         public const string DEFAULT_VERSION_STAGE = "AWSCURRENT";
         public const uint DEFAULT_CACHE_ITEM_TTL = 3600000;
+        public static readonly TimeSpan DefaultExceptionRetryDelayBase = TimeSpan.FromSeconds(1);
+        public static readonly TimeSpan DefaultExceptionRetryDelayMax = TimeSpan.FromSeconds(128);
+        public static readonly TimeSpan DefaultForceRefreshDelayBase = TimeSpan.FromMilliseconds(3500);
+        public static readonly TimeSpan DefaultForceRefreshDelayJitter = TimeSpan.FromSeconds(1);
 
         /// <summary>
         /// Gets or sets the TTL of a cache item in milliseconds. The default value for this is 3600000 millseconds, or one hour.
@@ -48,5 +54,29 @@ namespace Amazon.SecretsManager.Extensions.Caching
         /// Gets or sets the optional <see cref="ISecretCacheHook"/> implementation.
         /// </summary>
         public ISecretCacheHook CacheHook { get; set; } = null;
+
+        /// <summary>
+        /// Gets or sets the base delay for exponential backoff after a failed request.
+        /// The default value is 1 second.
+        /// </summary>
+        public TimeSpan ExceptionRetryDelayBase { get; set; } = DefaultExceptionRetryDelayBase;
+
+        /// <summary>
+        /// Gets or sets the maximum delay for exponential backoff after repeated failures.
+        /// The default value is 128 seconds.
+        /// </summary>
+        public TimeSpan ExceptionRetryDelayMax { get; set; } = DefaultExceptionRetryDelayMax;
+
+        /// <summary>
+        /// Gets or sets the base delay for the jitter sleep during a forced refresh.
+        /// The default value is 3.5 seconds.
+        /// </summary>
+        public TimeSpan ForceRefreshDelayBase { get; set; } = DefaultForceRefreshDelayBase;
+
+        /// <summary>
+        /// Gets or sets the random jitter variance added to the forced refresh delay.
+        /// The default value is 1 second.
+        /// </summary>
+        public TimeSpan ForceRefreshDelayJitter { get; set; } = DefaultForceRefreshDelayJitter;
     }
 }
