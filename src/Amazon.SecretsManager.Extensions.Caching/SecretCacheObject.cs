@@ -22,28 +22,8 @@ namespace Amazon.SecretsManager.Extensions.Caching
 
     public abstract class SecretCacheObject<T>
     {
-        /// The number of milliseconds to wait after an exception. 
-        private const long EXCEPTION_BACKOFF = 1000;
-
-        /// The growth factor of the backoff duration. 
-        private const long EXCEPTION_BACKOFF_GROWTH_FACTOR = 2;
-        
-        /// The maximum number of milliseconds to wait before retrying a failed
-        /// request.
-        private const long BACKOFF_PLATEAU = 128 * EXCEPTION_BACKOFF;
-
-        private JitteredDelay EXCEPTION_JITTERED_DELAY = new JitteredDelay(TimeSpan.FromMilliseconds(EXCEPTION_BACKOFF), 
-                                                                    TimeSpan.FromMilliseconds(EXCEPTION_BACKOFF), 
-                                                                    TimeSpan.FromMilliseconds(BACKOFF_PLATEAU));
-        
-        /// When forcing a refresh using the refreshNow method, a random sleep
-        /// will be performed using this value.  This helps prevent code from
-        /// executing a refreshNow in a continuous loop without waiting.
-        private const long FORCE_REFRESH_JITTER_BASE_INCREMENT = 3500;
-        private const long FORCE_REFRESH_JITTER_VARIANCE = 1000;
-
-        private JitteredDelay FORCE_REFRESH_JITTERED_DELAY = new JitteredDelay(TimeSpan.FromMilliseconds(FORCE_REFRESH_JITTER_BASE_INCREMENT),
-                                                                        TimeSpan.FromMilliseconds(FORCE_REFRESH_JITTER_VARIANCE));
+        private readonly JitteredDelay exceptionJitteredDelay;
+        private readonly JitteredDelay forceRefreshJitteredDelay;
 
         /// The secret identifier for this cached object. 
         protected String secretId;
@@ -75,7 +55,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
         private long exceptionCount = 0;
         
         /// The time to wait before retrying a failed AWS Secrets Manager request.
-        private long nextRetryTime = 0;
+        private DateTime nextRetryTime = DateTime.MinValue;
 
         public static readonly ThreadLocal<Random> random = new ThreadLocal<Random>(() => new Random(Environment.TickCount));
 
@@ -92,6 +72,13 @@ namespace Amazon.SecretsManager.Extensions.Caching
             this.secretId = secretId;
             this.client = client;
             this.config = config;
+            this.exceptionJitteredDelay = new JitteredDelay(
+                config.ExceptionRetryDelayBase,
+                config.ExceptionRetryDelayBase,
+                config.ExceptionRetryDelayMax);
+            this.forceRefreshJitteredDelay = new JitteredDelay(
+                config.ForceRefreshDelayBase,
+                config.ForceRefreshDelayJitter);
         }
      
         protected abstract Task<T> ExecuteRefreshAsync(CancellationToken cancellationToken = default);
@@ -139,7 +126,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
             //
             // If we have exceeded our backoff time we will refresh
             // the secret now.
-            return Environment.TickCount >= nextRetryTime;
+            return DateTime.UtcNow >= nextRetryTime;
         }
 
         /// <summary>
@@ -159,10 +146,11 @@ namespace Amazon.SecretsManager.Extensions.Caching
             catch (Exception ex) when (ex is AmazonServiceException || ex is AmazonClientException)
             {
                 exception = ex;
+                exceptionCount++;
                 // Determine the amount of growth in exception backoff time based on the growth
                 // factor and default backoff duration.
 
-                nextRetryTime = Environment.TickCount + EXCEPTION_JITTERED_DELAY.GetRetryDelay((int)exceptionCount).Milliseconds;
+                nextRetryTime = DateTime.UtcNow + exceptionJitteredDelay.GetRetryDelay((int)exceptionCount);
             }
             return false;
         }
@@ -171,13 +159,14 @@ namespace Amazon.SecretsManager.Extensions.Caching
         /// Method to force the refresh of a cached secret state.
         /// Returns true if the refresh completed without error.
         /// </summary>
+        /// <exception cref="System.OperationCanceledException">Thrown when the <paramref name="cancellationToken"/> is cancelled during the backoff delay.</exception>
         public async Task<bool> RefreshNowAsync(CancellationToken cancellationToken = default)
         {
             refreshNeeded = true;
             // When forcing a refresh, always sleep with a random jitter
             // to prevent coding errors that could be calling refreshNow
             // in a loop.
-            long sleep = FORCE_REFRESH_JITTERED_DELAY.GetRetryDelay(1).Milliseconds;
+            TimeSpan sleep = forceRefreshJitteredDelay.GetRetryDelay(1);
 
             // Make sure we are not waiting for the next refresh after an
             // exception.  If we are, sleep based on the retry delay of
@@ -185,10 +174,13 @@ namespace Amazon.SecretsManager.Extensions.Caching
             // secret that continues to throw an exception such as AccessDenied.
             if (null != exception)
             {
-                long wait = nextRetryTime - Environment.TickCount;
-                sleep = Math.Max(wait, sleep);
+                TimeSpan wait = nextRetryTime - DateTime.UtcNow;
+                if (wait > sleep)
+                {
+                    sleep = wait;
+                }
             }
-            Thread.Sleep((int)sleep);
+            await Task.Delay(sleep, cancellationToken);
 
             // Perform the requested refresh.
             bool success = false;

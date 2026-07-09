@@ -388,8 +388,9 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
 
             }
 
-            // Wait for backoff interval before retrying to verify a retry is performed.
-            Thread.Sleep(2100);
+            // exceptionCount increments to 1 after the first failure, so the backoff
+            // at count=1 is ~2s + jitter. Wait long enough for it to expire.
+            Thread.Sleep(3000);
 
             try
             {
@@ -399,6 +400,156 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
             {
                 Assert.Equal("Expected exception 2", exception.Message);
             }
+        }
+
+        [Fact]
+        public async Task RefreshNowAsyncRespectsTokenCancellation()
+        {
+            Mock<IAmazonSecretsManager> secretsManager = new Mock<IAmazonSecretsManager>(MockBehavior.Strict);
+            secretsManager.SetupSequence(i => i.GetSecretValueAsync(It.Is<GetSecretValueRequest>(j => j.SecretId == secretStringResponse1.Name), default(CancellationToken)))
+                .ReturnsAsync(secretStringResponse1)
+                .ThrowsAsync(new AmazonSecretsManagerException("This should not be called"));
+            secretsManager.SetupSequence(i => i.DescribeSecretAsync(It.Is<DescribeSecretRequest>(j => j.SecretId == secretStringResponse1.Name), default(CancellationToken)))
+                .ReturnsAsync(describeSecretResponse1)
+                .ThrowsAsync(new AmazonSecretsManagerException("This should not be called"));
+
+            SecretsManagerCache cache = new SecretsManagerCache(secretsManager.Object);
+
+            // First call to populate the cache
+            await cache.GetSecretString(secretStringResponse1.Name);
+
+            // Cancel immediately - RefreshNowAsync should throw OperationCanceledException
+            // promptly during the jitter delay rather than blocking the thread
+            using (var cts = new CancellationTokenSource())
+            {
+                cts.Cancel();
+
+                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                    () => cache.RefreshNowAsync(secretStringResponse1.Name, cts.Token));
+                stopwatch.Stop();
+
+                // With await Task.Delay and a pre-cancelled token, cancellation should be
+                // near-instant (< 100ms). This verifies the delay is non-blocking and
+                // respects the CancellationToken.
+                Assert.True(stopwatch.ElapsedMilliseconds < 100,
+                    $"Expected cancellation within 100ms but took {stopwatch.ElapsedMilliseconds}ms. " +
+                    $"This suggests the delay is blocking rather than using async cancellation.");
+            }
+        }
+
+        [Fact]
+        public async Task RefreshNowAsyncAfterExceptionWithExpiredBackoff()
+        {
+            // Covers the branch: exception != null, but nextRetryTime is in the past
+            // (wait is negative), so sleep remains the base jitter value.
+            var fastConfig = new SecretCacheConfiguration
+            {
+                ExceptionRetryDelayBase = TimeSpan.FromMilliseconds(1),
+                ExceptionRetryDelayMax = TimeSpan.FromMilliseconds(1),
+                ForceRefreshDelayBase = TimeSpan.FromMilliseconds(10),
+                ForceRefreshDelayJitter = TimeSpan.FromMilliseconds(5)
+            };
+
+            Mock<IAmazonSecretsManager> secretsManager = new Mock<IAmazonSecretsManager>(MockBehavior.Strict);
+            secretsManager.SetupSequence(i => i.DescribeSecretAsync(It.Is<DescribeSecretRequest>(j => j.SecretId == secretStringResponse1.Name), It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new AmazonServiceException("Expected failure"))
+                .ReturnsAsync(describeSecretResponse1);
+            secretsManager.Setup(i => i.GetSecretValueAsync(It.Is<GetSecretValueRequest>(j => j.SecretId == secretStringResponse1.Name), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(secretStringResponse1);
+
+            SecretsManagerCache cache = new SecretsManagerCache(secretsManager.Object, fastConfig);
+
+            // Trigger an exception to set nextRetryTime
+            try { await cache.GetSecretString(secretStringResponse1.Name); }
+            catch (AmazonServiceException) { }
+
+            // Wait for backoff to expire (nextRetryTime will be in the past)
+            Thread.Sleep(50);
+
+            // RefreshNowAsync enters the exception branch with negative wait.
+            // Should not throw and should recover successfully.
+            bool success = await cache.RefreshNowAsync(secretStringResponse1.Name);
+            Assert.True(success);
+        }
+
+        [Fact]
+        public async Task RefreshNowAsyncAfterExceptionWithActiveBackoff()
+        {
+            // Covers the branch: exception != null, nextRetryTime is in the future,
+            // and wait > sleep, so sleep is set to wait.
+            // Use fast config so backoff exceeds force-refresh jitter quickly.
+            var fastConfig = new SecretCacheConfiguration
+            {
+                ExceptionRetryDelayBase = TimeSpan.FromMilliseconds(50),
+                ExceptionRetryDelayMax = TimeSpan.FromSeconds(5),
+                ForceRefreshDelayBase = TimeSpan.FromMilliseconds(10),
+                ForceRefreshDelayJitter = TimeSpan.FromMilliseconds(5)
+            };
+
+            Mock<IAmazonSecretsManager> secretsManager = new Mock<IAmazonSecretsManager>(MockBehavior.Strict);
+            secretsManager.Setup(i => i.DescribeSecretAsync(It.Is<DescribeSecretRequest>(j => j.SecretId == secretStringResponse1.Name), It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new AmazonServiceException("Persistent failure"));
+
+            SecretsManagerCache cache = new SecretsManagerCache(secretsManager.Object, fastConfig);
+
+            // Each call when backoff has expired triggers DescribeSecret, which fails
+            // and increments exceptionCount. With base=50ms, backoffs are:
+            // count=1 ~65ms, count=2 ~115ms, count=3 ~215ms, count=4 ~415ms
+            for (int i = 0; i < 4; i++)
+            {
+                try { await cache.GetSecretString(secretStringResponse1.Name); }
+                catch (AmazonServiceException) { }
+                Thread.Sleep(250);
+            }
+
+            // One more call to push exceptionCount to 4 with a longer backoff
+            try { await cache.GetSecretString(secretStringResponse1.Name); }
+            catch (AmazonServiceException) { }
+
+            // Now nextRetryTime is well in the future (>400ms), which exceeds
+            // the force-refresh jitter (~15ms). Use cancellation to verify the
+            // code path without actually waiting.
+            using (var cts = new CancellationTokenSource())
+            {
+                cts.Cancel();
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                    () => cache.RefreshNowAsync(secretStringResponse1.Name, cts.Token));
+            }
+        }
+
+        [Fact]
+        public async Task RefreshNowAsyncWithNegativeWaitSucceeds()
+        {
+            // When nextRetryTime is in the past, wait is negative and does not
+            // replace sleep (which is always positive), so Task.Delay is safe.
+            var fastConfig = new SecretCacheConfiguration
+            {
+                ExceptionRetryDelayBase = TimeSpan.FromMilliseconds(1),
+                ExceptionRetryDelayMax = TimeSpan.FromMilliseconds(1),
+                ForceRefreshDelayBase = TimeSpan.FromMilliseconds(10),
+                ForceRefreshDelayJitter = TimeSpan.FromMilliseconds(5)
+            };
+
+            Mock<IAmazonSecretsManager> secretsManager = new Mock<IAmazonSecretsManager>(MockBehavior.Strict);
+            secretsManager.SetupSequence(i => i.DescribeSecretAsync(It.Is<DescribeSecretRequest>(j => j.SecretId == secretStringResponse1.Name), It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new AmazonServiceException("Expected failure"))
+                .ReturnsAsync(describeSecretResponse1);
+            secretsManager.Setup(i => i.GetSecretValueAsync(It.Is<GetSecretValueRequest>(j => j.SecretId == secretStringResponse1.Name), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(secretStringResponse1);
+
+            SecretsManagerCache cache = new SecretsManagerCache(secretsManager.Object, fastConfig);
+
+            // Trigger an exception so nextRetryTime is set
+            try { await cache.GetSecretString(secretStringResponse1.Name); }
+            catch (AmazonServiceException) { }
+
+            // Wait long enough for nextRetryTime to be in the past (wait becomes negative)
+            Thread.Sleep(50);
+
+            // Negative wait is less than sleep, so sleep stays positive — no exception
+            bool success = await cache.RefreshNowAsync(secretStringResponse1.Name);
+            Assert.True(success);
         }
 
         class TestHook : ISecretCacheHook
