@@ -53,7 +53,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
         /// </summary>
         protected override async Task<GetSecretValueResponse> ExecuteRefreshAsync(CancellationToken cancellationToken = default)
         {
-            return await this.client.GetSecretValueAsync(new GetSecretValueRequest { SecretId = this.secretId, VersionId = this.versionId }, cancellationToken);
+            return await this.client.GetSecretValueAsync(new GetSecretValueRequest { SecretId = this.secretId, VersionId = this.versionId }, cancellationToken).ConfigureAwait(false);
         }
 
         protected override Task<GetSecretValueResponse> GetSecretValueAsync(GetSecretValueResponse result, CancellationToken cancellationToken = default)

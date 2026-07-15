@@ -40,7 +40,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
         /// </summary>
         protected override async Task<DescribeSecretResponse> ExecuteRefreshAsync(CancellationToken cancellationToken = default)
         {
-            return await client.DescribeSecretAsync(new DescribeSecretRequest { SecretId = secretId }, cancellationToken);
+            return await client.DescribeSecretAsync(new DescribeSecretRequest { SecretId = secretId }, cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -53,7 +53,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
             {
                 return null;
             }
-            return await version.GetSecretValue(cancellationToken);
+            return await version.GetSecretValue(cancellationToken).ConfigureAwait(false);
         }
 
         public override int GetHashCode()
