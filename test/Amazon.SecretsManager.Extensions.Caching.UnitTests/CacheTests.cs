@@ -585,7 +585,7 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
                 .ReturnsAsync(describeSecretResponse1)
                 .ReturnsAsync(describeSecretResponse1)
                 .ThrowsAsync(new AmazonSecretsManagerException("This should not be called"));
-            
+
             TestHook testHook = new TestHook();
             SecretsManagerCache cache = new SecretsManagerCache(secretsManager.Object, new SecretCacheConfiguration { CacheHook = testHook });
 
@@ -600,6 +600,113 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
                 Assert.Equal(await cache.GetSecretBinary(binaryResponse1.Name), binaryResponse1.SecretBinary.ToArray());
             }
             Assert.Equal(4, testHook.GetCount());
+        }
+
+        // [UNRELIABLE] Concurrency test
+        [Fact]
+        public async Task ConcurrentGetSecretStringOnlyRefreshesOnce()
+        {
+            int describeCallCount = 0;
+            Mock<IAmazonSecretsManager> secretsManager = new Mock<IAmazonSecretsManager>(MockBehavior.Strict);
+            secretsManager.Setup(i => i.GetSecretValueAsync(It.Is<GetSecretValueRequest>(j => j.SecretId == secretStringResponse1.Name), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(secretStringResponse1);
+            secretsManager.Setup(i => i.DescribeSecretAsync(It.Is<DescribeSecretRequest>(j => j.SecretId == secretStringResponse1.Name), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(() =>
+                {
+                    Interlocked.Increment(ref describeCallCount);
+                    return describeSecretResponse1;
+                });
+
+            SecretsManagerCache cache = new SecretsManagerCache(secretsManager.Object);
+
+            // Fire 20 concurrent requests for the same secret
+            var tasks = Enumerable.Range(0, 20)
+                .Select(_ => cache.GetSecretString(secretStringResponse1.Name))
+                .ToArray();
+
+            string[] results = await Task.WhenAll(tasks);
+
+            // All concurrent callers should receive the correct value
+            foreach (string result in results)
+            {
+                Assert.Equal(secretStringResponse1.SecretString, result);
+            }
+
+            // Only one DescribeSecret call should have been made despite 20 concurrent requests
+            Assert.Equal(1, describeCallCount);
+        }
+
+        // [UNRELIABLE] Concurrency test
+        [Fact]
+        public async Task ConcurrentGetSecretStringDifferentSecretsSucceeds()
+        {
+            Mock<IAmazonSecretsManager> secretsManager = new Mock<IAmazonSecretsManager>(MockBehavior.Strict);
+            secretsManager.Setup(i => i.GetSecretValueAsync(It.Is<GetSecretValueRequest>(j => j.SecretId == secretStringResponse1.Name), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(secretStringResponse1);
+            secretsManager.Setup(i => i.GetSecretValueAsync(It.Is<GetSecretValueRequest>(j => j.SecretId == secretStringResponse3.Name), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(secretStringResponse3);
+            secretsManager.Setup(i => i.DescribeSecretAsync(It.Is<DescribeSecretRequest>(j => j.SecretId == secretStringResponse1.Name), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(describeSecretResponse1);
+            secretsManager.Setup(i => i.DescribeSecretAsync(It.Is<DescribeSecretRequest>(j => j.SecretId == secretStringResponse3.Name), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(describeSecretResponse1);
+
+            SecretsManagerCache cache = new SecretsManagerCache(secretsManager.Object);
+
+            // Interleave requests for two different secrets concurrently
+            var tasks = new List<Task<string>>();
+            for (int i = 0; i < 10; i++)
+            {
+                tasks.Add(cache.GetSecretString(secretStringResponse1.Name));
+                tasks.Add(cache.GetSecretString(secretStringResponse3.Name));
+            }
+
+            string[] results = await Task.WhenAll(tasks);
+
+            // Verify each result matches its corresponding secret (even indices = secret1, odd = secret3)
+            for (int i = 0; i < results.Length; i++)
+            {
+                string expected = i % 2 == 0 ? secretStringResponse1.SecretString : secretStringResponse3.SecretString;
+                Assert.Equal(expected, results[i]);
+            }
+        }
+
+        // [UNRELIABLE] Concurrency test
+        [Fact]
+        public async Task ConcurrentRefreshNowDoesNotCorruptState()
+        {
+            int refreshCount = 0;
+            Mock<IAmazonSecretsManager> secretsManager = new Mock<IAmazonSecretsManager>(MockBehavior.Strict);
+            secretsManager.Setup(i => i.GetSecretValueAsync(It.Is<GetSecretValueRequest>(j => j.SecretId == secretStringResponse1.Name), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(secretStringResponse1);
+            secretsManager.Setup(i => i.DescribeSecretAsync(It.Is<DescribeSecretRequest>(j => j.SecretId == secretStringResponse1.Name), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(() =>
+                {
+                    Interlocked.Increment(ref refreshCount);
+                    return describeSecretResponse1;
+                });
+
+            // Minimal delay so refreshes complete quickly and contention is maximized
+            var fastConfig = new SecretCacheConfiguration
+            {
+                ForceRefreshDelayBase = TimeSpan.FromMilliseconds(1),
+                ForceRefreshDelayJitter = TimeSpan.FromMilliseconds(1)
+            };
+
+            SecretsManagerCache cache = new SecretsManagerCache(secretsManager.Object, fastConfig);
+
+            // Populate the cache first
+            await cache.GetSecretString(secretStringResponse1.Name);
+
+            // Launch 10 concurrent RefreshNowAsync calls to stress internal state transitions
+            var tasks = Enumerable.Range(0, 10)
+                .Select(_ => cache.RefreshNowAsync(secretStringResponse1.Name))
+                .ToArray();
+
+            bool[] results = await Task.WhenAll(tasks);
+
+            // All refreshes should complete successfully, and the cache should remain consistent
+            string value = await cache.GetSecretString(secretStringResponse1.Name);
+            Assert.Equal(secretStringResponse1.SecretString, value);
         }
     }
 }
