@@ -25,8 +25,9 @@ namespace Amazon.SecretsManager.Extensions.Caching
     /// </summary>
     public class SecretCacheItem : SecretCacheObject<DescribeSecretResponse>
     {
-        /// The cached secret value versions for this cached secret. 
+        /// The cached secret value versions for this cached secret.
         private readonly MemoryCache versions = new MemoryCache(new MemoryCacheOptions());
+        private readonly SemaphoreSlim versionsLock = new SemaphoreSlim(1, 1);
         private const ushort MAX_VERSIONS_CACHE_SIZE = 10;
         
         public SecretCacheItem(String secretId, IAmazonSecretsManager client, SecretCacheConfiguration config)
@@ -48,7 +49,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
         /// </summary>
         protected override async Task<GetSecretValueResponse> GetSecretValueAsync(DescribeSecretResponse result, CancellationToken cancellationToken = default)
         {
-            SecretCacheVersion version = GetVersion(result);
+            SecretCacheVersion version = await GetVersion(result, cancellationToken);
             if (version == null)
             {
                 return null;
@@ -72,10 +73,13 @@ namespace Amazon.SecretsManager.Extensions.Caching
         }
 
         /// <summary>
-        /// Retrieves the SecretCacheVersion corresponding to the Version Stage
-        /// specified by the SecretCacheConfiguration.
+        /// Asynchronously retrieves the <see cref="SecretCacheVersion"/> corresponding to the version stage
+        /// specified by the <see cref="SecretCacheConfiguration"/>.
         /// </summary>
-        private SecretCacheVersion GetVersion(DescribeSecretResponse describeResult)
+        /// <param name="describeResult">The describe secret response containing version-to-stage mappings.</param>
+        /// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+        /// <returns>A task that represents the asynchronous operation. The task result contains the matching <see cref="SecretCacheVersion"/>, or <c>null</c> if no version matches the configured stage.</returns>
+        private async Task<SecretCacheVersion> GetVersion(DescribeSecretResponse describeResult, CancellationToken cancellationToken = default)
         {
             if (null == describeResult?.VersionIdsToStages) return null;
             String currentVersionId = null;
@@ -90,13 +94,25 @@ namespace Amazon.SecretsManager.Extensions.Caching
             if (currentVersionId != null)
             {
                 SecretCacheVersion version = versions.Get<SecretCacheVersion>(currentVersionId);
-                if (null == version)
+                if (version == null)
                 {
-                    version = versions.Set(currentVersionId, new SecretCacheVersion(secretId, currentVersionId, client, config));
-                    if (versions.Count > MAX_VERSIONS_CACHE_SIZE)
+                    await this.versionsLock.WaitAsync(cancellationToken);
+                    try
                     {
-                        TrimCacheToSizeLimit();
+                        version = versions.GetOrCreate<SecretCacheVersion>(currentVersionId, entry =>
+                        {
+                            return new SecretCacheVersion(secretId, currentVersionId, client, config);
+                        });
+
+                        if (versions.Count > MAX_VERSIONS_CACHE_SIZE)
+                        {
+                            TrimCacheToSizeLimit();
+                        }
                     }
+                    finally
+                    {
+                        this.versionsLock.Release();
+                    } 
                 }
                 return version;
             }
@@ -105,7 +121,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
 
         private void TrimCacheToSizeLimit()
         {
-            versions.Compact((double)(versions.Count - config.MaxCacheSize) / versions.Count);
+            versions.Compact((double)(versions.Count - MAX_VERSIONS_CACHE_SIZE) / versions.Count);
         }
     }
 }

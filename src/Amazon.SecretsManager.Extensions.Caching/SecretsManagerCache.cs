@@ -29,6 +29,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
         private readonly SecretCacheConfiguration config;
         private readonly MemoryCacheEntryOptions cacheItemPolicy;
         private readonly MemoryCache cache = new MemoryCache(new MemoryCacheOptions{ CompactionPercentage = 0 });
+        private readonly SemaphoreSlim cacheLock = new SemaphoreSlim(1,1);
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SecretsManagerCache"/> class.
@@ -88,9 +89,12 @@ namespace Amazon.SecretsManager.Extensions.Caching
         /// <summary>
         /// Asynchronously retrieves the specified SecretString after calling <see cref="GetCachedSecret"/>.
         /// </summary>
+        /// <param name="secretId">The secret identifier (ARN or friendly name).</param>
+        /// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+        /// <returns>A task that represents the asynchronous operation. The task result contains the secret string value, or <c>null</c> if not present.</returns>
         public async Task<String> GetSecretString(String secretId, CancellationToken cancellationToken = default)
         {
-            SecretCacheItem secret = GetCachedSecret(secretId);
+            SecretCacheItem secret = await GetCachedSecret(secretId, cancellationToken);
             GetSecretValueResponse response = null;
             response = await secret.GetSecretValue(cancellationToken);
             return response?.SecretString;
@@ -99,38 +103,62 @@ namespace Amazon.SecretsManager.Extensions.Caching
         /// <summary>
         /// Asynchronously retrieves the specified SecretBinary after calling <see cref="GetCachedSecret"/>.
         /// </summary>
+        /// <param name="secretId">The secret identifier (ARN or friendly name).</param>
+        /// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+        /// <returns>A task that represents the asynchronous operation. The task result contains the secret binary value, or <c>null</c> if not present.</returns>
         public async Task<byte[]> GetSecretBinary(String secretId, CancellationToken cancellationToken = default)
         {
-            SecretCacheItem secret = GetCachedSecret(secretId);
+            SecretCacheItem secret = await GetCachedSecret(secretId, cancellationToken);
             GetSecretValueResponse response = null;
             response = await secret.GetSecretValue(cancellationToken);
             return response?.SecretBinary?.ToArray();
         }
 
         /// <summary>
-        /// Requests the secret value from SecretsManager asynchronously and updates the cache entry with any changes.
+        /// Requests the secret value from Secrets Manager asynchronously and updates the cache entry with any changes.
         /// If there is no existing cache entry, a new one is created.
-        /// Returns true or false depending on if the refresh is successful.
         /// </summary>
+        /// <param name="secretId">The secret identifier (ARN or friendly name).</param>
+        /// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+        /// <returns>A task that represents the asynchronous operation. The task result is <c>true</c> if the refresh succeeded; otherwise, <c>false</c>.</returns>
         public async Task<bool> RefreshNowAsync(String secretId, CancellationToken cancellationToken = default)
         {
-            return await GetCachedSecret(secretId).RefreshNowAsync(cancellationToken);
+            SecretCacheItem secretCacheItem = await GetCachedSecret(secretId, cancellationToken);
+            return await secretCacheItem.RefreshNowAsync(cancellationToken);
         }
 
         /// <summary>
-        /// Returns the cache entry corresponding to the specified secret if it exists in the cache.
+        /// Asynchronously returns the cache entry corresponding to the specified secret if it exists in the cache.
         /// Otherwise, the secret value is fetched from Secrets Manager and a new cache entry is created.
         /// </summary>
-        public SecretCacheItem GetCachedSecret(string secretId)
+        /// <param name="secretId">The secret identifier (ARN or friendly name).</param>
+        /// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+        /// <returns>A task that represents the asynchronous operation. The task result contains the <see cref="SecretCacheItem"/> for the specified secret.</returns>
+        public async Task<SecretCacheItem> GetCachedSecret(string secretId, CancellationToken cancellationToken = default)
         {
             SecretCacheItem secret = cache.Get<SecretCacheItem>(secretId);
+
             if (secret == null)
             {
-                secret = cache.Set<SecretCacheItem>(secretId, new SecretCacheItem(secretId, secretsManager, config), cacheItemPolicy);
-                if (cache.Count > config.MaxCacheSize)
+                await this.cacheLock.WaitAsync(cancellationToken);
+
+                try
                 {
-                    // Trim cache size to MaxCacheSize, evicting entries using LRU.
-                    cache.Compact((double)(cache.Count - config.MaxCacheSize) / cache.Count);
+                    secret = cache.GetOrCreate<SecretCacheItem>(secretId, entry =>
+                    {
+                        entry.SetOptions(cacheItemPolicy);
+                        return new SecretCacheItem(secretId, secretsManager, config);
+                    });
+
+                    if (cache.Count > config.MaxCacheSize)
+                    {
+                        // Trim cache size to MaxCacheSize, evicting entries using LRU.
+                        cache.Compact((double)(cache.Count - config.MaxCacheSize) / cache.Count);
+                    }
+                }
+                finally
+                {
+                    this.cacheLock.Release();
                 }
             }
 
