@@ -25,10 +25,13 @@ namespace Amazon.SecretsManager.Extensions.Caching
     {
 
         /// <summary>
-        /// Returns the cache entry corresponding to the specified secret if it exists in the cache.
+        /// Asynchronously returns the cache entry corresponding to the specified secret if it exists in the cache.
         /// Otherwise, the secret value is fetched from Secrets Manager and a new cache entry is created.
         /// </summary>
-        SecretCacheItem GetCachedSecret(string secretId);
+        /// <param name="secretId">The secret identifier (ARN or friendly name).</param>
+        /// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+        /// <returns>A task that represents the asynchronous operation. The task result contains the <see cref="SecretCacheItem"/> for the specified secret.</returns>
+        Task<SecretCacheItem> GetCachedSecret(string secretId, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Asynchronously retrieves the specified SecretBinary after calling <see cref="GetCachedSecret"/>.

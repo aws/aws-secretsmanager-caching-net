@@ -25,11 +25,11 @@ namespace Amazon.SecretsManager.Extensions.Caching
         private readonly JitteredDelay exceptionJitteredDelay;
         private readonly JitteredDelay forceRefreshJitteredDelay;
 
+        /// A private object to synchronize access to certain methods. 
+        private readonly SemaphoreSlim objLock;
+
         /// The secret identifier for this cached object. 
         protected String secretId;
-
-        /// A private object to synchronize access to certain methods. 
-        protected static readonly SemaphoreSlim Lock = new SemaphoreSlim(1,1);
 
         /// The AWS Secrets Manager client to use for requesting secrets. 
         protected IAmazonSecretsManager client;
@@ -57,8 +57,6 @@ namespace Amazon.SecretsManager.Extensions.Caching
         /// The time to wait before retrying a failed AWS Secrets Manager request.
         private DateTime nextRetryTime = DateTime.MinValue;
 
-        public static readonly ThreadLocal<Random> random = new ThreadLocal<Random>(() => new Random(Environment.TickCount));
-
 
 
         /// <summary>
@@ -79,6 +77,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
             this.forceRefreshJitteredDelay = new JitteredDelay(
                 config.ForceRefreshDelayBase,
                 config.ForceRefreshDelayJitter);
+            this.objLock = new SemaphoreSlim(1,1);
         }
      
         protected abstract Task<T> ExecuteRefreshAsync(CancellationToken cancellationToken = default);
@@ -162,7 +161,6 @@ namespace Amazon.SecretsManager.Extensions.Caching
         /// <exception cref="System.OperationCanceledException">Thrown when the <paramref name="cancellationToken"/> is cancelled during the backoff delay.</exception>
         public async Task<bool> RefreshNowAsync(CancellationToken cancellationToken = default)
         {
-            refreshNeeded = true;
             // When forcing a refresh, always sleep with a random jitter
             // to prevent coding errors that could be calling refreshNow
             // in a loop.
@@ -184,14 +182,15 @@ namespace Amazon.SecretsManager.Extensions.Caching
 
             // Perform the requested refresh.
             bool success = false;
-            await Lock.WaitAsync(cancellationToken);
+            await objLock.WaitAsync(cancellationToken);
+            refreshNeeded = true;
             try
             {
                 success = await RefreshAsync(cancellationToken);
             }
             finally
             {
-                Lock.Release();
+                objLock.Release();
             }
             return (null == exception && success);
         }
@@ -204,14 +203,14 @@ namespace Amazon.SecretsManager.Extensions.Caching
         public async Task<GetSecretValueResponse> GetSecretValue(CancellationToken cancellationToken)
         {
             bool success = false;
-            await Lock.WaitAsync(cancellationToken);
+            await objLock.WaitAsync(cancellationToken);
             try
             {
                 success = await RefreshAsync(cancellationToken);
             }
             finally
             {
-                Lock.Release();
+                objLock.Release();
             }
 
             if (!success && null == data && null != exception)

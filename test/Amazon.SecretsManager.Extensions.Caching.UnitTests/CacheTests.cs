@@ -17,6 +17,7 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
     using System.Collections.Generic;
     using System.IO;
     using System.Linq;
+    using System.Reflection;
     using System.Threading;
     using System.Threading.Tasks;
     using Amazon.Runtime;
@@ -585,7 +586,7 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
                 .ReturnsAsync(describeSecretResponse1)
                 .ReturnsAsync(describeSecretResponse1)
                 .ThrowsAsync(new AmazonSecretsManagerException("This should not be called"));
-            
+
             TestHook testHook = new TestHook();
             SecretsManagerCache cache = new SecretsManagerCache(secretsManager.Object, new SecretCacheConfiguration { CacheHook = testHook });
 
@@ -600,6 +601,228 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
                 Assert.Equal(await cache.GetSecretBinary(binaryResponse1.Name), binaryResponse1.SecretBinary.ToArray());
             }
             Assert.Equal(4, testHook.GetCount());
+        }
+
+        [Fact]
+        public async Task VersionsCacheTrimsBeyondMaxSize()
+        {
+            // Verify that the internal versions cache is trimmed when it goes over the maximum allotted size
+            //
+            // Uses RefreshNowAsync on the same SecretCacheItem to force
+            // repeated DescribeSecret calls, each returning a different version ID.
+            // This accumulates versions in the same SecretCacheItem's internal cache.
+            int describeCallCount = 0;
+            int getSecretValueCallCount = 0;
+            Mock<IAmazonSecretsManager> secretsManager = new Mock<IAmazonSecretsManager>(MockBehavior.Strict);
+
+            secretsManager.Setup(i => i.DescribeSecretAsync(It.Is<DescribeSecretRequest>(j => j.SecretId == "RotatingSecret"), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(() =>
+                {
+                    int count = Interlocked.Increment(ref describeCallCount);
+                    string versionId = count.ToString().PadLeft(32, '0');
+                    return new DescribeSecretResponse
+                    {
+                        VersionIdsToStages = new Dictionary<string, List<string>>
+                        {
+                            { versionId, new List<string> { "AWSCURRENT" } }
+                        }
+                    };
+                });
+
+            secretsManager.Setup(i => i.GetSecretValueAsync(It.Is<GetSecretValueRequest>(j => j.SecretId == "RotatingSecret"), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((GetSecretValueRequest req, CancellationToken _) =>
+                {
+                    Interlocked.Increment(ref getSecretValueCallCount);
+                    return new GetSecretValueResponse
+                    {
+                        Name = "RotatingSecret",
+                        VersionId = req.VersionId,
+                        SecretString = $"Value-{req.VersionId}"
+                    };
+                });
+
+            // Minimal force-refresh delay so RefreshNowAsync completes quickly
+            var config = new SecretCacheConfiguration
+            {
+                MaxCacheSize = 1000,
+                ForceRefreshDelayBase = TimeSpan.FromMilliseconds(1),
+                ForceRefreshDelayJitter = TimeSpan.FromMilliseconds(1)
+            };
+
+            SecretsManagerCache cache = new SecretsManagerCache(secretsManager.Object, config);
+
+            // Initial fetch — populates the SecretCacheItem with version 1
+            string result = await cache.GetSecretString("RotatingSecret");
+            Assert.NotNull(result);
+
+            // Get a reference to the same SecretCacheItem for reflection later
+            SecretCacheItem cacheItem = await cache.GetCachedSecret("RotatingSecret");
+
+            // Read the MAX_VERSIONS_CACHE_SIZE constant via reflection
+            int maxVersionsCacheSize = (ushort)typeof(SecretCacheItem)
+                .GetField("MAX_VERSIONS_CACHE_SIZE", BindingFlags.NonPublic | BindingFlags.Static)
+                .GetValue(null);
+
+            // Force enough refreshes to exceed capacity, each returning a new version ID
+            int refreshCount = maxVersionsCacheSize + 5;
+            for (int i = 0; i < refreshCount; i++)
+            {
+                await cache.RefreshNowAsync("RotatingSecret");
+                string value = await cache.GetSecretString("RotatingSecret");
+                Assert.NotNull(value);
+            }
+
+            // 1 initial + refreshCount forced refreshes
+            int expectedCalls = 1 + refreshCount;
+            Assert.Equal(expectedCalls, describeCallCount);
+            Assert.Equal(expectedCalls, getSecretValueCallCount);
+
+            // Verify the internal versions cache was trimmed to MAX_VERSIONS_CACHE_SIZE
+            FieldInfo versionsField = typeof(SecretCacheItem).GetField("versions", BindingFlags.NonPublic | BindingFlags.Instance);
+            dynamic versionsCache = versionsField.GetValue(cacheItem);
+            int versionsCacheCount = (int)versionsCache.Count;
+            Assert.Equal(maxVersionsCacheSize, versionsCacheCount);
+        }
+
+        [Trait("Category", "Concurrency")]
+        [Fact]
+        public async Task ConcurrentGetSecretStringOnlyRefreshesOnce()
+        {
+            int describeCallCount = 0;
+            var barrier = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            Mock<IAmazonSecretsManager> secretsManager = new Mock<IAmazonSecretsManager>(MockBehavior.Strict);
+            secretsManager.Setup(i => i.GetSecretValueAsync(It.Is<GetSecretValueRequest>(j => j.SecretId == secretStringResponse1.Name), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(secretStringResponse1);
+            secretsManager.Setup(i => i.DescribeSecretAsync(It.Is<DescribeSecretRequest>(j => j.SecretId == secretStringResponse1.Name), It.IsAny<CancellationToken>()))
+                .Returns(async (DescribeSecretRequest _, CancellationToken __) =>
+                {
+                    await barrier.Task;
+                    Interlocked.Increment(ref describeCallCount);
+                    return describeSecretResponse1;
+                });
+
+            SecretsManagerCache cache = new SecretsManagerCache(secretsManager.Object);
+
+            // Fire 20 concurrent requests for the same secret
+            var tasks = Enumerable.Range(0, 20)
+                .Select(_ => cache.GetSecretString(secretStringResponse1.Name))
+                .ToArray();
+
+            // Release all callers simultaneously to force contention
+            barrier.SetResult(true);
+
+            string[] results = await Task.WhenAll(tasks);
+
+            // All concurrent callers should receive the correct value
+            foreach (string result in results)
+            {
+                Assert.Equal(secretStringResponse1.SecretString, result);
+            }
+
+            // Only one DescribeSecret call should have been made despite 20 concurrent requests
+            Assert.Equal(1, describeCallCount);
+        }
+
+        [Trait("Category", "Concurrency")]
+        [Fact]
+        public async Task ConcurrentGetSecretStringDifferentSecretsSucceeds()
+        {
+            var barrier = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            Mock<IAmazonSecretsManager> secretsManager = new Mock<IAmazonSecretsManager>(MockBehavior.Strict);
+            secretsManager.Setup(i => i.GetSecretValueAsync(It.Is<GetSecretValueRequest>(j => j.SecretId == secretStringResponse1.Name), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(secretStringResponse1);
+            secretsManager.Setup(i => i.GetSecretValueAsync(It.Is<GetSecretValueRequest>(j => j.SecretId == secretStringResponse3.Name), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(secretStringResponse3);
+            secretsManager.Setup(i => i.DescribeSecretAsync(It.Is<DescribeSecretRequest>(j => j.SecretId == secretStringResponse1.Name), It.IsAny<CancellationToken>()))
+                .Returns(async (DescribeSecretRequest _, CancellationToken __) =>
+                {
+                    await barrier.Task;
+                    return describeSecretResponse1;
+                });
+            secretsManager.Setup(i => i.DescribeSecretAsync(It.Is<DescribeSecretRequest>(j => j.SecretId == secretStringResponse3.Name), It.IsAny<CancellationToken>()))
+                .Returns(async (DescribeSecretRequest _, CancellationToken __) =>
+                {
+                    await barrier.Task;
+                    return describeSecretResponse1;
+                });
+
+            SecretsManagerCache cache = new SecretsManagerCache(secretsManager.Object);
+
+            // Interleave requests for two different secrets concurrently
+            var tasks = new List<Task<string>>();
+            for (int i = 0; i < 10; i++)
+            {
+                tasks.Add(cache.GetSecretString(secretStringResponse1.Name));
+                tasks.Add(cache.GetSecretString(secretStringResponse3.Name));
+            }
+
+            // Release all callers simultaneously to force contention
+            barrier.SetResult(true);
+
+            string[] results = await Task.WhenAll(tasks);
+
+            // Verify each result matches its corresponding secret (even indices = secret1, odd = secret3)
+            for (int i = 0; i < results.Length; i++)
+            {
+                string expected = i % 2 == 0 ? secretStringResponse1.SecretString : secretStringResponse3.SecretString;
+                Assert.Equal(expected, results[i]);
+            }
+        }
+
+        [Trait("Category", "Concurrency")]
+        [Fact]
+        public async Task ConcurrentRefreshNowDoesNotCorruptState()
+        {
+            int refreshCount = 0;
+            var barrier = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            Mock<IAmazonSecretsManager> secretsManager = new Mock<IAmazonSecretsManager>(MockBehavior.Strict);
+            secretsManager.Setup(i => i.GetSecretValueAsync(It.Is<GetSecretValueRequest>(j => j.SecretId == secretStringResponse1.Name), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(secretStringResponse1);
+            secretsManager.Setup(i => i.DescribeSecretAsync(It.Is<DescribeSecretRequest>(j => j.SecretId == secretStringResponse1.Name), It.IsAny<CancellationToken>()))
+                .Returns(async (DescribeSecretRequest _, CancellationToken __) =>
+                {
+                    return describeSecretResponse1;
+                });
+
+            var fastConfig = new SecretCacheConfiguration
+            {
+                ForceRefreshDelayBase = TimeSpan.FromMilliseconds(1),
+                ForceRefreshDelayJitter = TimeSpan.FromMilliseconds(1)
+            };
+
+            SecretsManagerCache cache = new SecretsManagerCache(secretsManager.Object, fastConfig);
+
+            // Populate the cache first
+            await cache.GetSecretString(secretStringResponse1.Name);
+
+            // Set up DescribeSecretAsync with a barrier to have more deterministic interleaving
+            secretsManager.Setup(i => i.DescribeSecretAsync(It.Is<DescribeSecretRequest>(j => j.SecretId == secretStringResponse1.Name), It.IsAny<CancellationToken>()))
+                .Returns(async (DescribeSecretRequest _, CancellationToken __) =>
+                {
+                    await barrier.Task;
+                    Interlocked.Increment(ref refreshCount);
+                    return describeSecretResponse1;
+                });
+
+            // Launch 10 concurrent RefreshNowAsync calls to stress internal state transitions
+            var tasks = Enumerable.Range(0, 10)
+                .Select(_ => cache.RefreshNowAsync(secretStringResponse1.Name))
+                .ToArray();
+
+            // Release the barrier so they interleave
+            barrier.SetResult(true);
+
+            bool[] results = await Task.WhenAll(tasks);
+
+            // Every RefreshNowAsync call should have completed successfully
+            Assert.All(results, success => Assert.True(success));
+
+            // DescribeSecret should have been called at least once beyond the initial populate
+            Assert.Equal(10, refreshCount);
+
+            // The cache should remain consistent after concurrent refreshes
+            string value = await cache.GetSecretString(secretStringResponse1.Name);
+            Assert.Equal(secretStringResponse1.SecretString, value);
         }
     }
 }
