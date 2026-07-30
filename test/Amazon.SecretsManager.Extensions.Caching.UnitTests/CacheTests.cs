@@ -781,8 +781,6 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
             secretsManager.Setup(i => i.DescribeSecretAsync(It.Is<DescribeSecretRequest>(j => j.SecretId == secretStringResponse1.Name), It.IsAny<CancellationToken>()))
                 .Returns(async (DescribeSecretRequest _, CancellationToken __) =>
                 {
-                    await barrier.Task;
-                    Interlocked.Increment(ref refreshCount);
                     return describeSecretResponse1;
                 });
 
@@ -794,16 +792,25 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
 
             SecretsManagerCache cache = new SecretsManagerCache(secretsManager.Object, fastConfig);
 
-            // Release the barrier immediately so the initial populate succeeds
-            barrier.SetResult(true);
-
             // Populate the cache first
             await cache.GetSecretString(secretStringResponse1.Name);
+
+            // Set up DescribeSecretAsync with a barrier to have more deterministic interleaving
+            secretsManager.Setup(i => i.DescribeSecretAsync(It.Is<DescribeSecretRequest>(j => j.SecretId == secretStringResponse1.Name), It.IsAny<CancellationToken>()))
+                .Returns(async (DescribeSecretRequest _, CancellationToken __) =>
+                {
+                    await barrier.Task;
+                    Interlocked.Increment(ref refreshCount);
+                    return describeSecretResponse1;
+                });
 
             // Launch 10 concurrent RefreshNowAsync calls to stress internal state transitions
             var tasks = Enumerable.Range(0, 10)
                 .Select(_ => cache.RefreshNowAsync(secretStringResponse1.Name))
                 .ToArray();
+
+            // Release the barrier so they interleave
+            barrier.SetResult(true);
 
             bool[] results = await Task.WhenAll(tasks);
 
@@ -811,7 +818,7 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
             Assert.All(results, success => Assert.True(success));
 
             // DescribeSecret should have been called at least once beyond the initial populate
-            Assert.Equal(11, refreshCount);
+            Assert.Equal(10, refreshCount);
 
             // The cache should remain consistent after concurrent refreshes
             string value = await cache.GetSecretString(secretStringResponse1.Name);
