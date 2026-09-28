@@ -142,7 +142,20 @@ namespace Amazon.SecretsManager.Extensions.Caching
                 exceptionCount = 0;
                 return true;
             }
-            catch (Exception ex) when (ex is AmazonServiceException || ex is AmazonClientException)
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                // The caller gave up, so nothing was learned about the secret. With no
+                // cached result yet, refresh again on the next call instead of returning
+                // an empty one.
+                if (null == data)
+                {
+                    refreshNeeded = true;
+                }
+                throw;
+            }
+            // A request timeout is recorded like an AWS error. .NET Core reports it as a
+            // TimeoutException, .NET Framework as a canceled operation.
+            catch (Exception ex) when (ex is AmazonServiceException || ex is AmazonClientException || ex is TimeoutException || ex is OperationCanceledException)
             {
                 exception = ex;
                 exceptionCount++;

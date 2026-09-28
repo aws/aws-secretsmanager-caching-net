@@ -25,6 +25,15 @@ namespace Amazon.SecretsManager.Extensions.Caching
     /// </summary>
     public class SecretsManagerCache : ISecretsManagerCache
     {
+        /// <summary>
+        /// The timeout for each request made by the client that the cache creates when none is passed in.
+        /// The SDK otherwise uses the HttpClient default of 100 seconds, so an endpoint that accepts a
+        /// connection and never answers stalls the caller for minutes. On .NET Core and later, a timed out
+        /// request is retried like any other network error; on .NET Framework it is not. A client passed in
+        /// keeps its own timeout.
+        /// </summary>
+        public static readonly TimeSpan DefaultRequestTimeout = TimeSpan.FromSeconds(2);
+
         private readonly IAmazonSecretsManager secretsManager;
         private readonly SecretCacheConfiguration config;
         private readonly MemoryCacheEntryOptions cacheItemPolicy;
@@ -35,7 +44,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
         /// Initializes a new instance of the <see cref="SecretsManagerCache"/> class.
         /// </summary>
         public SecretsManagerCache()
-            : this(new AmazonSecretsManagerClient(), new SecretCacheConfiguration())
+            : this(CreateDefaultClient(), new SecretCacheConfiguration())
         {
         }
 
@@ -51,7 +60,7 @@ namespace Amazon.SecretsManager.Extensions.Caching
         /// Initializes a new instance of the <see cref="SecretsManagerCache"/> class.
         /// </summary>
         public SecretsManagerCache(SecretCacheConfiguration config)
-            : this(new AmazonSecretsManagerClient(), config)
+            : this(CreateDefaultClient(), config)
         {
         }
 
@@ -70,6 +79,11 @@ namespace Amazon.SecretsManager.Extensions.Caching
             {
                 sm.BeforeRequestEvent += this.ServiceClientBeforeRequestEvent;
             }
+        }
+
+        private static AmazonSecretsManagerClient CreateDefaultClient()
+        {
+            return new AmazonSecretsManagerClient(new AmazonSecretsManagerConfig { Timeout = DefaultRequestTimeout });
         }
 
         private void ServiceClientBeforeRequestEvent(object sender, RequestEventArgs e)

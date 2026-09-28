@@ -70,6 +70,21 @@ You can configure the `SecretCacheConfiguration` object with the following param
 * `Client` - The Secrets Manager client to be used by the Cache. The default value is `null`, which causes the Cache to instantiate a new Secrets Manager client.
 * `CacheHook` - An implementation of the ISecretCacheHook interface. The default value is `null`.
 
+### Request Timeouts
+
+If you don't pass in a client, the cache creates one whose requests time out after `SecretsManagerCache.DefaultRequestTimeout` (2 seconds). The SDK otherwise uses the HttpClient default of 100 seconds. On .NET Core and later, a timed out request is retried like any other network error. If you pass in your own client, the cache uses its timeout unchanged, so set it yourself:
+
+```cs
+var client = new AmazonSecretsManagerClient(new AmazonSecretsManagerConfig { Timeout = TimeSpan.FromSeconds(2) });
+var cache = new SecretsManagerCache(client);
+```
+
+You can also pass a `CancellationToken` to bound a single call.
+
+On .NET Core and later, this timeout covers sending the request and waiting for the response headers, but not reading the response body. On .NET Framework, it covers waiting for the response headers but not connecting, the TLS handshake, or reading the response body, and a timed out request is not retried.
+
+A timed out request is handled like an error from Secrets Manager: the call throws it, and until the retry delay passes, later calls for that secret throw it again. If the secret is already cached, its cached value is returned instead. `RefreshNowAsync` returns `false` after a timeout. The exception is a `TimeoutException` on .NET Core and later, and an `OperationCanceledException` on .NET Framework, even though you didn't cancel the call.
+
 ## Post-Quantum TLS Support
 
 This library automatically supports Post-Quantum TLS when available on the underlying platform:

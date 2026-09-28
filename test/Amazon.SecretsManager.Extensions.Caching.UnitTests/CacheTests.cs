@@ -17,6 +17,8 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
     using System.Collections.Generic;
     using System.IO;
     using System.Linq;
+    using System.Net;
+    using System.Net.Sockets;
     using System.Reflection;
     using System.Threading;
     using System.Threading.Tasks;
@@ -823,6 +825,253 @@ namespace Amazon.SecretsManager.Extensions.Caching.UnitTests
             // The cache should remain consistent after concurrent refreshes
             string value = await cache.GetSecretString(secretStringResponse1.Name);
             Assert.Equal(secretStringResponse1.SecretString, value);
+        }
+
+        [Fact]
+        public async Task RequestTimeoutIsReportedNotReturnedAsNull()
+        {
+            // .NET Core reports a request timeout as a TimeoutException, .NET Framework
+            // as a canceled operation that the caller did not ask for.
+            foreach (Exception timeout in new Exception[] { new TimeoutException("The request timed out"), new OperationCanceledException() })
+            {
+                Mock<IAmazonSecretsManager> secretsManager = new Mock<IAmazonSecretsManager>(MockBehavior.Strict);
+                secretsManager.Setup(i => i.DescribeSecretAsync(It.Is<DescribeSecretRequest>(j => j.SecretId == secretStringResponse1.Name), It.IsAny<CancellationToken>()))
+                    .ThrowsAsync(timeout);
+
+                SecretsManagerCache cache = new SecretsManagerCache(secretsManager.Object);
+                Exception first = await Assert.ThrowsAnyAsync<Exception>(() => cache.GetSecretString(secretStringResponse1.Name));
+                Assert.Same(timeout, first);
+
+                // The failure is remembered like an AWS error, so the next call reports it too
+                // instead of returning null until the cache item expires.
+                Exception second = await Assert.ThrowsAnyAsync<Exception>(() => cache.GetSecretString(secretStringResponse1.Name));
+                Assert.Same(timeout, second);
+            }
+        }
+
+        /// <summary>
+        /// Sets up DescribeSecretAsync so that the given call cancels the caller's token
+        /// while the request is in flight, and every other call succeeds.
+        /// </summary>
+        private Mock<IAmazonSecretsManager> CancelledOnDescribeCall(int cancelledCall, CancellationTokenSource cts, Func<int> countCall)
+        {
+            Mock<IAmazonSecretsManager> secretsManager = new Mock<IAmazonSecretsManager>(MockBehavior.Strict);
+            secretsManager.Setup(i => i.DescribeSecretAsync(It.Is<DescribeSecretRequest>(j => j.SecretId == secretStringResponse1.Name), It.IsAny<CancellationToken>()))
+                .Returns((DescribeSecretRequest _, CancellationToken token) =>
+                {
+                    if (countCall() == cancelledCall)
+                    {
+                        cts.Cancel();
+                        return Task.FromCanceled<DescribeSecretResponse>(token);
+                    }
+
+                    return Task.FromResult(describeSecretResponse1);
+                });
+            secretsManager.Setup(i => i.GetSecretValueAsync(It.Is<GetSecretValueRequest>(j => j.SecretId == secretStringResponse1.Name), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(secretStringResponse1);
+            return secretsManager;
+        }
+
+        [Fact]
+        public async Task CallerCancellationIsNotRemembered()
+        {
+            int describeCalls = 0;
+            using (var cts = new CancellationTokenSource())
+            {
+                var secretsManager = CancelledOnDescribeCall(1, cts, () => ++describeCalls);
+                SecretsManagerCache cache = new SecretsManagerCache(secretsManager.Object);
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => cache.GetSecretString(secretStringResponse1.Name, cts.Token));
+                Assert.Equal(1, describeCalls);
+
+                // The next call fetches the secret instead of returning null.
+                Assert.Equal(secretStringResponse1.SecretString, await cache.GetSecretString(secretStringResponse1.Name));
+                Assert.Equal(2, describeCalls);
+            }
+        }
+
+        [Fact]
+        public async Task CancelledRefreshKeepsCachedValue()
+        {
+            int describeCalls = 0;
+            using (var cts = new CancellationTokenSource())
+            {
+                var secretsManager = CancelledOnDescribeCall(2, cts, () => ++describeCalls);
+
+                // No delay before the forced refresh, to keep the test fast.
+                var config = new SecretCacheConfiguration { ForceRefreshDelayBase = TimeSpan.Zero, ForceRefreshDelayJitter = TimeSpan.Zero };
+                SecretsManagerCache cache = new SecretsManagerCache(secretsManager.Object, config);
+                Assert.Equal(secretStringResponse1.SecretString, await cache.GetSecretString(secretStringResponse1.Name));
+
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => cache.RefreshNowAsync(secretStringResponse1.Name, cts.Token));
+                Assert.Equal(2, describeCalls);
+
+                // The cached value is still returned, without another request.
+                Assert.Equal(secretStringResponse1.SecretString, await cache.GetSecretString(secretStringResponse1.Name));
+                Assert.Equal(2, describeCalls);
+            }
+        }
+
+        [Fact]
+        public void DefaultRequestTimeoutIsTwoSeconds()
+        {
+            Assert.Equal(TimeSpan.FromSeconds(2), SecretsManagerCache.DefaultRequestTimeout);
+        }
+
+        [Fact]
+        public void DefaultClientUsesDefaultRequestTimeout()
+        {
+            WithIsolatedAwsEnvironment("http://127.0.0.1:1", 1, () =>
+            {
+                using (var cache = new SecretsManagerCache())
+                {
+                    Assert.Equal(SecretsManagerCache.DefaultRequestTimeout, ClientOf(cache).Config.Timeout);
+                }
+
+                using (var cache = new SecretsManagerCache(new SecretCacheConfiguration()))
+                {
+                    Assert.Equal(SecretsManagerCache.DefaultRequestTimeout, ClientOf(cache).Config.Timeout);
+                }
+            });
+        }
+
+        [Fact]
+        public void ClientPassedInKeepsItsOwnTimeout()
+        {
+            var client = new AmazonSecretsManagerClient(
+                new BasicAWSCredentials("akid", "secret"),
+                new AmazonSecretsManagerConfig { RegionEndpoint = RegionEndpoint.USWest2, Timeout = TimeSpan.FromSeconds(30) });
+            using (var cache = new SecretsManagerCache(client))
+            {
+                Assert.Same(client, ClientOf(cache));
+                Assert.Equal(TimeSpan.FromSeconds(30), client.Config.Timeout);
+            }
+        }
+
+        [Fact]
+        public async Task DefaultClientGivesUpOnHungEndpoint()
+        {
+            TimeSpan elapsed = await TimeToGiveUpOnHungEndpoint(1);
+            Assert.True(
+                elapsed >= TimeSpan.FromSeconds(1.9) && elapsed < TimeSpan.FromSeconds(5),
+                $"Took {elapsed} to give up");
+        }
+
+#if !NETFRAMEWORK
+        // The SDK only retries a timed out request on .NET Core and later.
+        [Fact]
+        public async Task DefaultClientRetriesTimedOutRequest()
+        {
+            // Two 2 second attempts, plus a short backoff between them.
+            TimeSpan elapsed = await TimeToGiveUpOnHungEndpoint(2);
+            Assert.True(
+                elapsed >= TimeSpan.FromSeconds(3.9) && elapsed < TimeSpan.FromSeconds(8),
+                $"Took {elapsed} to give up");
+        }
+#endif
+
+        private static AmazonSecretsManagerClient ClientOf(SecretsManagerCache cache)
+        {
+            return (AmazonSecretsManagerClient)typeof(SecretsManagerCache)
+                .GetField("secretsManager", BindingFlags.NonPublic | BindingFlags.Instance)
+                .GetValue(cache);
+        }
+
+        /// <summary>
+        /// Runs action with a region, dummy credentials and the given endpoint and
+        /// attempt count set, so the developer's own AWS settings can't change the
+        /// test. The SDK caches these settings per process, so they are reset
+        /// before and after.
+        /// </summary>
+        private static async Task WithIsolatedAwsEnvironment(string endpoint, int maxAttempts, Func<Task> action)
+        {
+            var env = new Dictionary<string, string>
+            {
+                ["AWS_ENDPOINT_URL_SECRETS_MANAGER"] = endpoint,
+                ["AWS_IGNORE_CONFIGURED_ENDPOINT_URLS"] = null,
+                ["AWS_PROFILE"] = null,
+                ["AWS_REGION"] = "us-west-2",
+                ["AWS_ACCESS_KEY_ID"] = "akid",
+                ["AWS_SECRET_ACCESS_KEY"] = "secret",
+                ["AWS_SESSION_TOKEN"] = null,
+                ["AWS_CONFIG_FILE"] = Path.Combine(Path.GetTempPath(), "no-such-aws-config"),
+                ["AWS_SHARED_CREDENTIALS_FILE"] = Path.Combine(Path.GetTempPath(), "no-such-aws-credentials"),
+                ["AWS_MAX_ATTEMPTS"] = maxAttempts.ToString(),
+                ["HTTP_PROXY"] = null,
+                ["HTTPS_PROXY"] = null,
+                ["ALL_PROXY"] = null,
+                ["http_proxy"] = null,
+                ["https_proxy"] = null,
+                ["all_proxy"] = null,
+            };
+            var original = env.Keys.ToDictionary(k => k, Environment.GetEnvironmentVariable);
+            try
+            {
+                foreach (var kv in env)
+                {
+                    Environment.SetEnvironmentVariable(kv.Key, kv.Value);
+                }
+
+                ResetSdkSettings();
+                await action();
+            }
+            finally
+            {
+                foreach (var kv in original)
+                {
+                    Environment.SetEnvironmentVariable(kv.Key, kv.Value);
+                }
+
+                ResetSdkSettings();
+            }
+        }
+
+        private static void WithIsolatedAwsEnvironment(string endpoint, int maxAttempts, Action action)
+        {
+            WithIsolatedAwsEnvironment(endpoint, maxAttempts, () =>
+            {
+                action();
+                return Task.CompletedTask;
+            }).GetAwaiter().GetResult();
+        }
+
+        private static void ResetSdkSettings()
+        {
+            Amazon.Runtime.Internal.FallbackInternalConfigurationFactory.Reset();
+            FallbackRegionFactory.Reset();
+        }
+
+        /// <summary>
+        /// Returns how long the default client takes to fail against an endpoint that
+        /// hangs, and checks that it failed with a timeout.
+        /// </summary>
+        private static async Task<TimeSpan> TimeToGiveUpOnHungEndpoint(int maxAttempts)
+        {
+            // A listener that never accepts completes the TCP handshake but never
+            // answers, like an endpoint that hangs after connecting.
+            var hung = new TcpListener(IPAddress.Loopback, 0);
+            hung.Start();
+            try
+            {
+                TimeSpan elapsed = TimeSpan.Zero;
+                await WithIsolatedAwsEnvironment($"http://127.0.0.1:{((IPEndPoint)hung.LocalEndpoint).Port}", maxAttempts, async () =>
+                {
+                    using (var cache = new SecretsManagerCache())
+                    {
+                        var watch = System.Diagnostics.Stopwatch.StartNew();
+                        Exception ex = await Assert.ThrowsAnyAsync<Exception>(() => cache.GetSecretString("test"));
+                        elapsed = watch.Elapsed;
+
+                        // .NET Core reports the HttpClient timeout as a TimeoutException,
+                        // .NET Framework as a canceled operation.
+                        Assert.True(ex is TimeoutException || ex is OperationCanceledException, $"Expected a timeout, got {ex}");
+                    }
+                });
+                return elapsed;
+            }
+            finally
+            {
+                hung.Stop();
+            }
         }
     }
 }
